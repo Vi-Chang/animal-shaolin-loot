@@ -1,0 +1,8 @@
+# 遊戲截圖、名單備份、舊版 Artifact 不進版控
+*.jpg
+*.jpeg
+*.png
+成員名單.csv
+戰利品分配系統.html
+.DS_Store
+node_modules/

@@ -1,0 +1,511 @@
+<title>戰利品分配主控台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* 三頁精靈：①戰利品 ②上傳資料(拍照辨識) ③分配。暖紙背景＋硃砂/青雙重點色 */
+  :root{
+    --bg:#f1e9da; --surface:#fbf6ec; --surface2:#f3ebdb;
+    --ink:#2a2420; --muted:#6f6353; --line:#ddcfb6;
+    --accent:#c8452f; --accent-soft:#f3d9cf;
+    --jade:#2f7d6b; --jade-soft:#d5e7df;
+    --gold:#b0801f; --gold-soft:#f0e2c0;
+    --shadow:0 1px 2px rgba(60,42,20,.06),0 6px 20px rgba(60,42,20,.07);
+    --r:14px;
+    --font-head:"Noto Serif TC",Georgia,"Songti TC",serif;
+    --font-body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#1a1611; --surface:#241e17; --surface2:#2c251c; --ink:#ece3d4; --muted:#a89a85; --line:#3b3226;
+    --accent:#e8714f; --accent-soft:#4a2b23; --jade:#57bca2; --jade-soft:#23372f; --gold:#d6a948; --gold-soft:#3a2f18;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#1a1611; --surface:#241e17; --surface2:#2c251c; --ink:#ece3d4; --muted:#a89a85; --line:#3b3226;
+    --accent:#e8714f; --accent-soft:#4a2b23; --jade:#57bca2; --jade-soft:#23372f; --gold:#d6a948; --gold-soft:#3a2f18;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font-body);line-height:1.55;font-size:15.5px}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:40}
+  h1,h2,h3{font-family:var(--font-head);font-weight:700;margin:0;line-height:1.25;text-wrap:balance}
+  button{font-family:inherit;font-size:14px;cursor:pointer}
+  a{color:var(--accent)}
+  .tnum{font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+
+  header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--surface);border-bottom:1px solid var(--line)}
+  .top-inner{max-width:1000px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px}
+  .brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .seal{width:36px;height:36px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-family:var(--font-head);font-size:20px;flex:0 0 auto;box-shadow:var(--shadow)}
+  .brand h1{font-size:20px;letter-spacing:.5px}
+  .brand .sub{font-size:12px;color:var(--muted)}
+  .rolepill{margin-left:auto;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--surface2);white-space:nowrap}
+  .rolepill.w{color:var(--jade);border-color:var(--jade)}
+  .tabs{display:flex;gap:4px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{border:none;background:none;color:var(--muted);padding:9px 13px;border-radius:9px 9px 0 0;white-space:nowrap;font-weight:600;font-size:15px;border-bottom:2px solid transparent}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface2)}
+
+  main{max-width:1000px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 70px}
+  .banner{display:flex;gap:10px;align-items:flex-start;background:var(--gold-soft);border:1px solid var(--gold);color:var(--ink);border-radius:var(--r);padding:11px 14px;font-size:13px;margin-bottom:16px}
+  .banner.info{background:var(--jade-soft);border-color:var(--jade)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+  .card h2{font-size:18px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card .hint{color:var(--muted);font-size:13px;margin-bottom:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .stephead{font-size:13px;color:var(--accent);font-weight:700;letter-spacing:1px;margin-bottom:2px}
+
+  .btn{border:1px solid var(--line);background:var(--surface2);color:var(--ink);padding:9px 15px;border-radius:10px;font-weight:600;display:inline-flex;align-items:center;gap:6px;font-size:14px}
+  .btn:hover{border-color:var(--muted)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.jade{background:var(--jade);border-color:var(--jade);color:#fff}
+  .btn.big{padding:12px 18px;font-size:15px}
+  .btn.sm{padding:5px 10px;font-size:13px;border-radius:8px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .next{display:flex;justify-content:flex-end;margin-top:4px}
+  select,input[type=text],input[type=number]{font-family:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);max-width:100%}
+  input[type=number]{width:84px}
+  textarea{width:100%;font-family:inherit;font-size:15px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);min-height:84px;resize:vertical}
+  label.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .chip.role{font-weight:600}
+  .chip.r-族長,.chip.r-副族長{color:var(--accent);border-color:var(--accent)}
+  .chip.r-內務管家,.chip.r-核心成員{color:var(--gold);border-color:var(--gold)}
+  .chip.wish{background:var(--jade-soft);border-color:var(--jade);color:var(--jade)}
+  .chip.got{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+  .chip .del{cursor:pointer;font-weight:700;opacity:.6}
+  .chip .del:hover{opacity:1}
+  .kpi{display:flex;gap:20px;flex-wrap:wrap}
+  .kpi .b{font-family:var(--font-head);font-size:26px;line-height:1}
+  .kpi .l{font-size:12px;color:var(--muted);margin-top:3px}
+
+  /* 戰利品列（步驟一／三共用） */
+  .lootrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+  .lootrow:first-of-type{border-top:none}
+  .lootrow .nm{flex:1 1 140px;font-weight:700}
+  .lootrow .rem{font-family:var(--font-head);font-size:16px}
+  .lootrow .rem.zero{color:var(--accent)}
+
+  /* 上傳區塊 */
+  .up{border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:12px;background:var(--surface)}
+  .up h3{font-size:16px;display:flex;align-items:center;gap:8px}
+  .up .tag{font-size:11px;font-weight:700;color:var(--jade);background:var(--jade-soft);border:1px solid var(--jade);border-radius:999px;padding:1px 8px}
+  .up .st{font-size:13px;color:var(--muted);margin:6px 0 10px}
+  .up .st.ok{color:var(--jade);font-weight:600}
+  .up .st.err{color:var(--accent);font-weight:600}
+  .dropz{border:1.5px dashed var(--muted);border-radius:11px;padding:16px;text-align:center;background:var(--surface2);cursor:pointer}
+  .dropz b{color:var(--accent)}
+  .preview{margin-top:10px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:200px;overflow:auto}
+  .preview ol{margin:0;padding-left:22px;font-size:13.5px}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  details.paste{margin-top:8px}
+  details.paste>summary{font-size:13px;color:var(--muted);cursor:pointer;font-weight:600}
+
+  /* 分配：庫存＋成員卡 */
+  .stock{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px}
+  .spill{flex:0 0 auto;border:1px solid var(--line);border-radius:11px;padding:8px 11px;min-width:96px;background:var(--surface2)}
+  .spill .in{font-size:12.5px;font-weight:700;white-space:nowrap}
+  .spill .iq{font-family:var(--font-head);font-size:18px;margin-top:2px}
+  .spill .iq small{font-size:11px;color:var(--muted);font-family:var(--font-body)}
+  .spill.zero{border-color:var(--accent)}
+  .spill.zero .iq,.spill.zero .in{color:var(--accent)}
+  .warnbar{background:var(--accent-soft);border:1px solid var(--accent);color:var(--accent);font-weight:700;font-size:13.5px;border-radius:10px;padding:9px 12px;margin-bottom:10px}
+  .mcard{border:1px solid var(--line);border-radius:13px;background:var(--surface);padding:12px 13px;margin-bottom:10px}
+  .mcard.wanted{border-color:var(--jade);box-shadow:0 0 0 2px var(--jade-soft)}
+  .mtop{display:flex;align-items:center;gap:11px}
+  .mrank{font-family:var(--font-head);font-size:15px;width:32px;height:32px;border-radius:8px;background:var(--surface2);display:grid;place-items:center;flex:0 0 auto;color:var(--muted)}
+  .mrank.top{background:var(--accent);color:#fff}
+  .minfo{flex:1 1 auto;min-width:0}
+  .minfo .mn{font-weight:700;font-size:16px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .minfo .mm{font-size:12.5px;color:var(--muted);margin-top:2px;display:flex;gap:9px;flex-wrap:wrap}
+  .score{font-family:var(--font-head);font-weight:700;color:var(--ink)}
+  .arank{color:var(--jade);font-weight:600}
+  .tierbadge{font-weight:800;font-family:var(--font-head);border-radius:6px;padding:0 7px;color:#fff}
+  .tierbadge.t3{background:var(--accent)} .tierbadge.t2{background:var(--gold)} .tierbadge.t1{background:var(--jade)} .tierbadge.t0{background:var(--surface2);color:var(--muted)}
+  .give{flex:0 0 auto}
+  .mchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .mchips .lbl{font-size:11px;color:var(--muted);font-weight:700}
+  .want-tag{font-size:12px;color:var(--jade);font-weight:700}
+
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  th,td{padding:10px 11px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:12px;color:var(--muted);font-weight:700;background:var(--surface2)}
+  tr:last-child td{border-bottom:none}
+  td.name{font-weight:700;white-space:nowrap}
+  .statusdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--jade);margin-right:6px}
+  .statusdot.g{background:var(--muted)}
+  .empty{text-align:center;color:var(--muted);padding:24px 10px}
+  details.help{border:1px solid var(--line);border-radius:12px;padding:0 14px;margin-bottom:10px;background:var(--surface)}
+  details.help>summary{padding:13px 0;font-weight:700;cursor:pointer;font-family:var(--font-head);font-size:15px}
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:11px 20px;border-radius:999px;font-size:14.5px;font-weight:600;box-shadow:var(--shadow);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:60;max-width:90vw;text-align:center}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  #toast.err{background:var(--accent);color:#fff}
+  .iic{width:1.85em;height:1.85em;border-radius:5px;object-fit:cover;vertical-align:-0.5em;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+  @media (max-width:560px){th,td{padding:8px 8px}.kpi{gap:14px}.kpi .b{font-size:23px}}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&family=Noto+Serif+TC:wght@700&display=swap">
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="seal">戰</div>
+      <div><h1>戰利品分配主控台</h1><div class="sub">動物少林寺 · 族長與委託人分配</div></div>
+      <span class="rolepill" id="rolePill">連線中…</span>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="step1" aria-selected="true">① 本期戰利品</button>
+      <button class="tab" role="tab" data-tab="step2" aria-selected="false">② 上傳資料</button>
+      <button class="tab" role="tab" data-tab="step3" aria-selected="false">③ 本期分配</button>
+      <button class="tab" role="tab" data-tab="roster" aria-selected="false">名單</button>
+      <button class="tab" role="tab" data-tab="history" aria-selected="false">歷史</button>
+      <button class="tab" role="tab" data-tab="help" aria-selected="false">說明</button>
+    </nav>
+  </div>
+</header>
+<main id="view"><div class="empty">載入中…</div></main>
+<div id="toast"></div>
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+
+<script>
+const BOOTSTRAP_MEMBERS=[];
+const ROLE_ORDER=["族長","副族長","內務管家","核心成員","資深成員","高級成員","普通成員"];
+const COMMON_ITEMS=["誓約帖","誓約帖禮盒","邀約帖","琉璃花瓣","紫色精粹禮袋","金鈴鐺禮盒","鶴舞傳情","SSR夥伴碎片禮盒","SSR夥伴自選","SSR寵物自選","5級寶石禮袋","升星石禮盒","橙色精粹寶箱","橙1星裝備自選"];
+const ACTS=["夢域尋光","搶占藥田","家族盛會"];
+const UPKEYS=["contrib","夢域尋光","搶占藥田","家族盛會"];
+
+const state={roster:BOOTSTRAP_MEMBERS.map(m=>({name:m.n,role:m.r,status:m.s})),config:{activeRoundId:null},rounds:{},wishes:[],allocs:[]};
+let DB=null,USER=null,canWrite=false,dbLive=false;
+let sampleOK=false,sampleMax=4;
+let activeTab="step1";
+const upUI={},subs=[];let pendingUpKey=null;
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>Number(n||0).toLocaleString("en-US");
+const ICON_IMG={"誓約帖": "data:image/jpeg;base64,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", "荷塘風光": "data:image/jpeg;base64,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", "3級寶石禮袋": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBUODAsLDBkSEw8VHhsgHx4bHR0hJTApISMtJB0dKjkqLTEzNjY2ICg7Pzo0PjA1NjP/2wBDAQkJCQwLDBgODhgzIh0iMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzP/wAARCAA8ADwDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD2W9JFlOQcHYa4NsliT613l9/x4z/7hrhyvJ+tb4bZnNit0ZN9qsdpMIEXzZerKD90e/8AhWbc61P5o8uSOJCMncASKs6novmzPOh5YHcDkg/T06VgxXEV4PMSbCoCZCVwR6HPf6k8V6dKEJao5+aMY3tdm7a6tIxUsRKDxhQAc/pxWnBdJM2wqUfsD3rkI52SwOoxzSeSspSQqo3buwIxiug8OmS8tBeySli5IClQu3n2/nSqwUVccnF301NfFadnNIlsAHYcnvVDbV62H7hfx/nXJPVChudZe/8AHlN/uVxZX5j9a7W8H+hzf7tceV+Y/WufD7M6MVuijdI8yGCM4L8E1gvpE1pqspTSxLBKPLmkkIWPy/XjvnH611cUalw0lxHEAvHyF2PfoOnX1qW9dILWYTGNlCdVOVcEfKfx9K7aWIgnyR3M3RaV2ec3tlepoaafa6e8cKuZWeI7zJICcFj6Y/lWlZNNpE45LwOqsV7cjnH0Oa09CuZJoL8TSNI0d0UVmOTtCjA/nVbVTGkQRQOOBXZ8Xus5pxa33N9CsiK6HKsMg+tXYBiFfx/nWHoEjS6ftb+BsD6VvxDES/j/ADrz6q5W0a09Tp7z/jzm/wB2uUK8n61180fmwvHnG5cZrmbi2kglKMpz7VyUGrNHViU9GcvftcwXKsm44PQdSPb1xnp9DTotQiuhJDJEWLYG0KT06AemK3J7NbhcOhP4VRl0V3Xak0qD2Y1vGThsl/kY8ye7ZnhbPTY3jG6Muxdo4zuck+pOQD7c1h3czX90sVnGqO03kR/aroL58pUN5afLy2COTgcgZ5rpl8OYYNvc45H+cVz2o6d9m1q8uogIL2EKtozwTFdzKN8+VRhuUYVR2PJ6CqqVpxs4yd/66f5lUkptqS/r1H6HrvkWkbfZUEcgErIbgeekRcR+YY8fd3cfez3xiu6QYQD0z/OvL9O066S0nijt5Q11apGLYWDxyLMrDY3mbcbBgMWLfN3XNeyw6SXiBdyp9MVg6rldzLdFJrlNRZo2LANnacHikcQufnCMR/eGakorkVzs0ZB5dr/zzi/75FHl2v8Azzi/75FT0UXfcLLsQeXa/wDPOL/vkUuy2HRI/wDvmpqKLsLLsQhbcHIWMY/2ak8xP7wp1FGrCyP/2Q==", "邀約帖": "data:image/jpeg;base64,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", "琉璃花瓣": "data:image/jpeg;base64,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", "紫色精粹禮袋": "data:image/jpeg;base64,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", "金鈴鐺禮盒": "data:image/jpeg;base64,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", "SSR夥伴碎片禮盒": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBUODAsLDBkSEw8VHhsgHx4bHR0hJTApISMtJB0dKjkqLTEzNjY2ICg7Pzo0PjA1NjP/2wBDAQkJCQwLDBgODhgzIh0iMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzP/wAARCAA8ADwDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD2PVOdMn/3a4e3tvtV3b256TSqjfQnn9M13WpD/iXTf7tcdZHytStH8t5MOQBGwDA4OCM8HHPFeRjLe0jc9XCyaoysE6RSvqiTorX8lwIoxj7q7iMD0GAB/wDrrWn0+x8P6GSIEMrDG1lB3sf8/wCcVmyvZNcy6s19KFYmZkePDKMbRwOTkjjHfvUmoC8v4LTy90keTKAxwcEfKeenU8etc72uDmpTjC9u5zt3oNzE8V/cKApkwLYDYrDqenP5803xTeaXocyWFpCi37Y3SSMW8gds+/8AKughgcWkmpXMsbTbDIqSsQM543e+e1eY3VmXvXn1K5M1zK5eRYwcHPIO4+v04qOV9Dpjao9Xoux0+hXK31sJlDDBZWLHljkc/jzXfaKMacv+8a4jQEhaxSS3iEURQbVHuT1rudIGLBfqa2wv8QzxFvZadzV1Hmwm+lcb5iwzwlnRDuzlzgcA/wCNdpfj/QZfp/WuU2AjBFa4340YYTWm0ZaO0SOJLUzxw5XcBuDJ1BHY4J5HXuOlTQ30t1tkhmmt1ibfLIUCoqYwRg9TycfWrAtESQyQ7oX/AL0Z2/8A66rXtlJc7JJYYrmWJgyEs0ZJBzg44I/CuLXubOmubma17lPxTNeQxWryIqQu2ZAowc4+Ue3H61j6wsN0ixJHAt4Z18uKLA8mPByrvgAnOPXGDWzreuanfRxW89jbW37wMCBubI5HJyMd/wDOKs6TosE2mahc3bL50qszOyjaV+8enbI5xT53CPvdRp2intYrWd3psmom007ywkcAL+W5YM2ex9vb1rstKGLEfU1wr6jfx6wyusUUQmt1WIwglopSVyHDcEMDxt7V3mm8WY+tdVCm4TV+qM601KDS6M1poxLC6HuK524spIZSuOO1dErSktujUAHj5uop2XycIMf71dtajGrucVKrKmct9nk/u/rR9nk/u/rXU5f+4P8AvqkzJ/cH/fVYfUl3Nvrb7HLG0JfcYxuxjPGcVC2mghgqlFf76o2A3sR3rr90n9wf99UuX/uD/vqj6ku4fWn2PO77RtRuvEMDQWu+Bzbl5fMUbPKkdzx1OQwxiu8tLNLeAIQSc55qxuf+4P8Avqky/wDcH/fVdFOko28jCdRyuPooorcyCiiigAooopAFFFFMD//Z", "鶴舞傳情": "data:image/jpeg;base64,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", "誓約帖禮盒": "data:image/jpeg;base64,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", "SSR夥伴自選": "data:image/jpeg;base64,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", "5級寶石禮袋": "data:image/jpeg;base64,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", "橙1星裝備自選": "data:image/jpeg;base64,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", "升星石禮盒": "data:image/jpeg;base64,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", "橙色精粹寶箱": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBUODAsLDBkSEw8VHhsgHx4bHR0hJTApISMtJB0dKjkqLTEzNjY2ICg7Pzo0PjA1NjP/2wBDAQkJCQwLDBgODhgzIh0iMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzP/wAARCAA8ADwDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD13UR/xL5v92uHESn+FfyrutQ5sZvpXC3cssCp5NtJcOeqxqSVHrxXj4/416HsYFpQfqQeHfC8k3idxPNcDTNrSZEhC7uyE5/H6Cu4023/ANPm06eK1khVCY5rePZtx26n1rj7TxLYRWogvoLmOUEkqUKKfxNb1v4i0+3sI5ba6gimnJQnOTEo9j6+tKjVp2Sfz/yFVpyd2uu3+Zx3i2PUtK12a1imkusYMZaIOxB5x0/lWHe6priQmy1SKWJwhliSZSuR/eGe64B+ma9FbXbVEZbK5L3TZYykgfUj1P1rmdbvtIuI3bVLofad+UaA73VgOG9s9CO461z1FTbsnv8AgawjNJN9PxGaJfJfWYHR06r6e3+exFdxo4xp6/U15z4atQZfNhEiLncdwI+XHAwffPPcYr0nShixX6mrwnx6hinenoad8P8AQpfpXD3qyMyxRRzPvUbhEAeAwOCCwyDjtXdXvNnJ9K5GW3nMheCfyyyhW+UHoc8Z6HmtceryS8jmwjag7b3Mpbm4srk+buS3Y4MVxDKnGT0LAjPPritHVdQsrnTEsoNItpp1JO/5BjPfaDkmmnS18tj585nI4lMh3Z+tVxpUtwD9qkVscIHRW49+K4YwcU+V7nXKblJOUU7fIym8O6Zcz2qXNpIguJfLzCJImU+uGyD2rEigEN3IkcP2aIblSfGXZh0wTyf+Aiu0gtLKF1hmBsZeqywXDxI49vmwD/kVnWFgLgzJAXhjA+a5Rj5jcngP19+OKy5ZuXKUq6u7RH6BHLHFLHOZDINpzJ94jnnGcj8ea7TTRizX615zoerbZ4+Y51kMYcG5Mk0CSn92zfKFOSBkAkjIzXpOngC0X616WHpSpTSl2OWtVVSDa7mnOnmQOnqK5+W2eKQrtJroVcksPLYYOOe9DAE8xk+5ANdtehGrZ3OSlVdPQ5vyn/un8qPKf+6fyro9q/8APH/x0UbU/wCeP/jorn+pf3jb62+xzT23mDDx7h7imtbusLLFHtbadvHGccV0+1P+eP8A46KNqf8APH/x0U/qX94PrXkePWGk6q0rwtb3hkuZ7ebymsRCtvOjLvkLjCldocAAnO7oDzXrVraCKHaSTyTU4Cg5EWD7KKduP9xq61BN3ZzObtZDqKXFJWpmFFGKKACiiigAoooxQI//2Q==", "SSR寵物自選": "data:image/jpeg;base64,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"};
+const _REP=[["升星","升星石禮盒"],["寵物","SSR寵物自選"],["碎片","SSR夥伴碎片禮盒"],["夥伴","SSR夥伴自選"],["裝備","橙1星裝備自選"],["花瓣","琉璃花瓣"],["精粹","紫色精粹禮袋"],["寶石","5級寶石禮袋"],["鈴","金鈴鐺禮盒"],["鶴","鶴舞傳情"],["邀約","邀約帖"],["誓約","誓約帖"],["荷塘","荷塘風光"]];
+function iconFor(it){it=String(it||"");if(ICON_IMG[it])return '<img class="iic" src="'+ICON_IMG[it]+'" alt="">';for(var i=0;i<_REP.length;i++){var kw=_REP[i][0],key=_REP[i][1];if(it.indexOf(kw)>=0&&ICON_IMG[key])return '<img class="iic" src="'+ICON_IMG[key]+'" alt="">';}if(/禮盒|寶箱/.test(it))return"🎁";if(/禮袋/.test(it))return"👛";return"🎁";}
+let toastT;
+function toast(msg,err){const t=$("#toast");t.textContent=msg;t.classList.toggle("err",!!err);t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2600);}
+async function guardWrite(fn){if(!dbLive){toast("尚未連上資料庫，無法儲存",true);return;}if(!canWrite){toast("此帳號為唯讀，無法編輯",true);return;}try{await fn();}catch(e){console.error(e);toast("儲存失敗："+(e&&e.code||"錯誤"),true);}}
+function names(){return state.roster.map(m=>m.name);}
+function activeRound(){const id=state.config.activeRoundId;if(id&&state.rounds[id])return{id,...state.rounds[id]};const live=Object.entries(state.rounds).filter(([,r])=>r.status!=="已封存").sort((a,b)=>(b[1].date||"").localeCompare(a[1].date||""));return live[0]?{id:live[0][0],...live[0][1]}:null;}
+function allocOf(id){return state.allocs.filter(a=>a.roundId===id);}
+function wishOf(id){return state.wishes.filter(w=>w.roundId===id);}
+function remainingMap(round){const used={};allocOf(round.id).forEach(a=>{used[a.item]=(used[a.item]||0)+Number(a.qty||0);});const m={};(round.loot||[]).forEach(l=>{m[l.item]=Number(l.total||0)-(used[l.item]||0);});return m;}
+
+/* 名字比對（自動排除非家族） */
+function matchName(raw){
+  const s=String(raw||"").trim();if(!s)return null;const ns=names();
+  if(ns.includes(s))return s;
+  const cleaned=s.replace(/^[\s\d.、，,:：#＃)\]．]+/,"").replace(/[\s\d]+$/,"").trim();
+  if(ns.includes(cleaned))return cleaned;
+  for(const t of cleaned.split(/[\s,，、|]+/)) if(ns.includes(t)) return t;
+  return null;
+}
+
+/* 綜合評分：貢獻積分(0-100,依分數) + 活動積分(0-100,三活動排名平均) */
+function actList(round){var out=ACTS.slice();var cs=(round&&Array.isArray(round.activityList))?round.activityList:[];cs.forEach(function(a){if(out.indexOf(a)<0)out.push(a);});Object.keys((round&&round.activities)||{}).forEach(function(a){if(out.indexOf(a)<0)out.push(a);});return out;}
+async function addActivity(name){name=(name||"").trim();if(!name){toast("請輸入活動名稱",true);return;}const r=activeRound();if(!r){toast("請先建立分配期",true);return;}if(actList(r).indexOf(name)>=0){toast("已有這個活動",true);return;}const al=Array.isArray(r.activityList)?r.activityList.slice():[];al.push(name);await guardWrite(async()=>{await saveRound(r.id,{activityList:al});toast("已新增活動："+name);});}
+async function delActivity(name){const r=activeRound();if(!r)return;const al=(Array.isArray(r.activityList)?r.activityList:[]).filter(a=>a!==name);const acts={...(r.activities||{})};delete acts[name];delete upUI[name];await guardWrite(async()=>{await saveRound(r.id,{activityList:al,activities:acts});toast("已刪除活動："+name);});}
+function computeScores(round){
+  const normal=state.roster.filter(m=>m.status==="正常");
+  const c=round.contributions||{},acts=round.activities||{};
+  const maxC=Math.max(1,...normal.map(m=>Number(c[m.name]||0)));
+  const list=actList(round).filter(k=>(acts[k]||[]).length>0);
+  const aPts={},aRank={};
+  list.forEach(k=>{const arr=acts[k]||[],kk=arr.length;arr.forEach((nm,i)=>{(aPts[nm]=aPts[nm]||{})[k]=kk?(kk-i)/kk*100:0;(aRank[nm]=aRank[nm]||{})[k]=i+1;});});
+  return normal.map(m=>{
+    const cv=Number(c[m.name]||0),cS=cv/maxC*100;
+    const ap=aPts[m.name]||{};let sum=0;list.forEach(k=>{sum+=(ap[k]||0);});
+    const aAvg=list.length?sum/list.length:0;
+    return{name:m.name,role:m.role,cv,cS,aAvg,rank:aRank[m.name]||{},composite:cS+aAvg};
+  }).sort((a,b)=>b.composite-a.composite||b.cv-a.cv);
+}
+function tiersFrom(scored){const have=scored.filter(x=>x.composite>0),n=have.length,t3=Math.ceil(n/3),t2=Math.ceil(n*2/3),t={};have.forEach((x,i)=>t[x.name]=i<t3?3:i<t2?2:1);return t;}
+
+/* ---------- 連線 ---------- */
+/* ===== Supabase 後端（Edge Function）===== */
+const API_BASE="https://fjqishllglruchsoyscl.supabase.co/functions/v1/loot";
+let MGR_PASS=(()=>{try{return localStorage.getItem("loot_pass")||""}catch(e){return ""}})();
+async function api(action,extra){
+  const res=await fetch(API_BASE,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(Object.assign({action,pass:MGR_PASS},extra||{}))});
+  let j={};try{j=await res.json();}catch(e){}
+  if(!res.ok){if(res.status===401){MGR_PASS="";try{localStorage.removeItem("loot_pass")}catch(e){}canWrite=false;updateRolePill();toast("委託人密碼錯誤，請重新登入",true);}throw (j&&j.error)||("http"+res.status);}
+  return j;
+}
+const _docCb={},_collCb={};
+const DBSHIM={
+  doc:(path)=>({set:(data)=>api("setDoc",{path,data}),delete:()=>api("delDoc",{path}),onSnapshot:(cb)=>{_docCb[path]=cb;return ()=>{delete _docCb[path]};}}),
+  collection:(coll)=>({add:(data)=>api("addDoc",{coll,data}),onSnapshot:(cb)=>{_collCb[coll]=cb;return ()=>{delete _collCb[coll]};}})
+};
+async function pull(){
+  let st;try{st=await api("state");}catch(e){return;}
+  if(_docCb["app/roster"])_docCb["app/roster"]({data:()=>({members:st.roster})});
+  if(_docCb["app/config"])_docCb["app/config"]({data:()=>st.config});
+  if(_collCb["rounds"])_collCb["rounds"]({docs:Object.entries(st.rounds).map(([id,d])=>({id,data:()=>d}))});
+  if(_collCb["wishes"])_collCb["wishes"]({docs:st.wishes.map(w=>({id:w.id,data:()=>w}))});
+  if(_collCb["allocations"])_collCb["allocations"]({docs:st.allocs.map(a=>({id:a.id,data:()=>a}))});
+}
+async function connect(){
+  sampleOK=true;canWrite=!!MGR_PASS;DB=DBSHIM;USER=null;
+  const pill=$("#rolePill");if(pill)pill.onclick=loginToggle;
+  updateRolePill();subscribe();
+  await pull();render();
+  setInterval(pull,6000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull();});
+}
+async function loginToggle(){
+  if(canWrite){if(confirm("登出委託人模式？")){MGR_PASS="";try{localStorage.removeItem("loot_pass")}catch(e){}canWrite=false;updateRolePill();render();}return;}
+  const p=prompt("輸入委託人密碼（族長／副族長）");if(!p)return;
+  try{const r=await fetch(API_BASE,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"checkPass",pass:p})});const j=await r.json();if(j&&j.ok){MGR_PASS=p;try{localStorage.setItem("loot_pass",p)}catch(e){}canWrite=true;updateRolePill();render();toast("委託人登入成功");}else{toast("密碼錯誤",true);}}catch(e){toast("登入失敗，稍後再試",true);}
+}
+function updateRolePill(){const p=$("#rolePill");if(!p)return;p.style.cursor="pointer";if(canWrite){p.textContent="委託人 · 可編輯（點此登出）";p.className="rolepill w";}else{p.textContent="成員檢視 · 點此委託人登入";p.className="rolepill";}}
+function subscribe(){
+  let got=false;const timer=setTimeout(()=>{if(!got)toast("資料庫連線中…若持續空白，請確認帳號權限");},10000);
+  const done=()=>{if(!got){got=true;dbLive=true;clearTimeout(timer);updateRolePill();}render();};
+  const onErr=e=>{console.error("db",e);toast("資料庫錯誤："+(e&&e.code||""),true);};
+  subs.push(DB.doc("app/roster").onSnapshot(s=>{const d=s.data();if(d&&Array.isArray(d.members)&&d.members.length)state.roster=d.members;done();},onErr));
+  subs.push(DB.doc("app/config").onSnapshot(s=>{const d=s.data();if(d)state.config=d;done();},onErr));
+  subs.push(DB.collection("rounds").onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());state.rounds=o;done();},onErr));
+  subs.push(DB.collection("wishes").onSnapshot(s=>{state.wishes=s.docs.map(d=>({id:d.id,...d.data()}));done();},onErr));
+  subs.push(DB.collection("allocations").onSnapshot(s=>{state.allocs=s.docs.map(d=>({id:d.id,...d.data()}));done();},onErr));
+}
+
+/* ---------- 寫入 ---------- */
+async function saveRoster(){await DB.doc("app/roster").set({members:state.roster});}
+async function toggleGhost(name){const m=state.roster.find(x=>x.name===name);if(!m)return;m.status=m.status==="幽靈"?"正常":"幽靈";await guardWrite(async()=>{await saveRoster();toast(m.name+" → "+m.status);});}
+async function saveRound(id,patch){const r=state.rounds[id]||{};await DB.doc("rounds/"+id).set({...r,...patch});}
+async function createRound(name,dateStr){const id="r"+Date.now();await guardWrite(async()=>{await DB.doc("rounds/"+id).set({name:name||("分配期 "+dateStr),date:dateStr,status:"進行中",loot:[],contributions:{},activities:{}});await DB.doc("app/config").set({...state.config,activeRoundId:id});toast("已建立："+(name||dateStr));});}
+async function archiveActive(){const r=activeRound();if(!r)return;await guardWrite(async()=>{await saveRound(r.id,{status:"已封存"});await DB.doc("app/config").set({...state.config,activeRoundId:null});toast("本期已封存");});}
+async function addLoot(item,total){const r=activeRound();if(!r){toast("請先建立分配期",true);return;}item=(item||"").trim();total=Math.max(1,Number(total)||1);if(!item)return;const loot=(r.loot||[]).slice();const ex=loot.find(l=>l.item===item);if(ex)ex.total=Number(ex.total||0)+total;else loot.push({item,total});await guardWrite(async()=>{await saveRound(r.id,{loot});toast("入庫："+item+"×"+total);});}
+async function setLootTotal(item,total){const r=activeRound();if(!r)return;total=Math.max(0,Number(total)||0);await guardWrite(async()=>{await saveRound(r.id,{loot:(r.loot||[]).map(l=>l.item===item?{...l,total}:l)});});}
+async function delLoot(item){const r=activeRound();if(!r)return;await guardWrite(async()=>{await saveRound(r.id,{loot:(r.loot||[]).filter(l=>l.item!==item)});});}
+async function addWish(member,item){if(!item||!member)return;const r=activeRound();if(!r){toast("尚無分配期",true);return;}try{await DB.collection("wishes").add({roundId:r.id,member,item,ts:Date.now()});toast("已許願："+member+" → "+item);}catch(e){toast("許願失敗，請稍後再試",true);}}
+async function delWish(id){try{await DB.doc("wishes/"+id).delete();}catch(e){toast("刪除失敗",true);}}
+async function addAlloc(member,item){const r=activeRound();if(!r)return;const rem=remainingMap(r)[item]??0;if(rem<1){toast("「"+item+"」已分完，數量不夠！",true);return;}await guardWrite(async()=>{await DB.collection("allocations").add({roundId:r.id,member,item,qty:1,ts:Date.now()});toast("✓ "+item+" → "+member+"，剩 "+(rem-1));});}
+async function delAlloc(id){await guardWrite(async()=>{await DB.doc("allocations/"+id).delete();});}
+
+/* ---------- 影像辨識（排除非家族） ---------- */
+function sampleErr(c){return({not_granted:"你尚未允許使用 Claude 辨識",rate_limited:"用量達上限，稍後再試",images_unavailable:"此裝置不支援照片辨識，請改貼文字",image_rejected:"照片格式不符或太大",refused:"無法辨識此照片",invalid_json:"辨識結果無法解析，請重拍或改貼文字",session_expired:"請重新登入"})[c]||"辨識失敗，請再試一次";}
+function fileToPart(f){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{const s=String(r.result);resolve({media_type:(f.type||"image/jpeg"),data:s.slice(s.indexOf(",")+1)});};r.onerror=reject;r.readAsDataURL(f);});}
+function parseLoose(t){if(!t)throw{code:"invalid_json"};const a=t.indexOf("["),b=t.lastIndexOf("]");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}throw{code:"invalid_json"};}
+async function runOCR(key,files){
+  const imgs=await Promise.all(Array.from(files).slice(0,6).map(fileToPart));
+  const res=await api("ocr",{mode:(key==="contrib"?"score":"rank"),images:imgs});
+  return parseLoose(res&&res.text);
+}
+async function handleFiles(files){
+  const key=pendingUpKey;pendingUpKey=null;if(!key||!files||!files.length)return;
+  upUI[key]={status:"loading"};render();
+  try{
+    const raw=await runOCR(key,files);
+    if(key==="contrib"){
+      const matched=[],seen=new Set();let dropped=0;
+      (Array.isArray(raw)?raw:[]).forEach(o=>{const nm=matchName(o&&o.name);if(nm&&!seen.has(nm)){seen.add(nm);matched.push({name:nm,score:Number(String(o.score).replace(/[^\d]/g,""))||0});}else if(o&&o.name)dropped++;});
+      upUI[key]={status:"done",contrib:matched,dropped};
+    }else{
+      const order=[],seen=new Set();let dropped=0;
+      (Array.isArray(raw)?raw:[]).forEach(n=>{const nm=matchName(n);if(nm&&!seen.has(nm)){seen.add(nm);order.push(nm);}else if(String(n).trim())dropped++;});
+      upUI[key]={status:"done",names:order,dropped};
+    }
+    render();
+  }catch(e){console.error(e);upUI[key]={status:"err",msg:sampleErr(e&&e.code)};render();toast(sampleErr(e&&e.code),true);}
+}
+async function confirmUpload(key){
+  const u=upUI[key];if(!u||u.status!=="done")return;const r=activeRound();if(!r){toast("請先建立分配期",true);return;}
+  if(key==="contrib"){const c={...(r.contributions||{})};u.contrib.forEach(x=>c[x.name]=x.score);await guardWrite(async()=>{await saveRound(r.id,{contributions:c});});}
+  else{const acts={...(r.activities||{})};acts[key]=u.names;await guardWrite(async()=>{await saveRound(r.id,{activities:acts});});}
+  upUI[key]={status:"saved"};toast("已儲存 "+(key==="contrib"?"貢獻":key));render();
+}
+function importPaste(key,text){
+  if(!text.trim())return toast("請先貼上內容",true);
+  if(key==="contrib"){const matched=[],seen=new Set();let dropped=0;text.split(/\n+/).forEach(line=>{const mt=line.trim().match(/^(.+?)[\s,，\t]+([\d,]+)\s*$/);if(!mt)return;const nm=matchName(mt[1]);if(nm&&!seen.has(nm)){seen.add(nm);matched.push({name:nm,score:Number(mt[2].replace(/,/g,""))||0});}else dropped++;});upUI[key]={status:"done",contrib:matched,dropped};}
+  else{const order=[],seen=new Set();let dropped=0;text.split(/\n+/).forEach(line=>{const nm=matchName(line);if(nm&&!seen.has(nm)){seen.add(nm);order.push(nm);}else if(line.trim())dropped++;});upUI[key]={status:"done",names:order,dropped};}
+  render();
+}
+
+/* ---------- 畫面 ---------- */
+function render(){({step1:renderStep1,step2:renderStep2,step3:renderStep3,roster:renderRoster,history:renderHistory,help:renderHelp}[activeTab]||renderStep1)();}
+function roleChip(r){return `<span class="chip role r-${esc(r)}">${esc(r)}</span>`;}
+function bannerLive(){if(!DB)return `<div class="banner"><div><b>唯讀／離線模式</b>　未連上雲端資料庫（可能未登入或在本機開啟），無法編輯或儲存。請用有權限的 Claude 帳號開啟。</div></div>`;if(!dbLive)return `<div class="banner"><div>連線雲端資料庫中…</div></div>`;return "";}
+function newRoundCard(){const today=new Date().toISOString().slice(0,10);return `<div class="card"><div class="stephead">步驟一</div><h2>先建立本期</h2><p class="hint">每次有新戰利品要分，就開一個分配期。</p>${canWrite?`<div class="row"><label class="fld">名稱<input type="text" id="nrName" placeholder="例：11/21 晚場" style="width:160px"></label><label class="fld">日期<input type="text" id="nrDate" value="${today}" style="width:130px"></label><button class="btn primary" data-act="createRound" style="align-self:flex-end">建立</button></div>`:`<p class="muted">目前唯讀，等待委託人建立。</p>`}</div>`;}
+
+function renderStep1(){
+  const r=activeRound(),v=$("#view");
+  if(!r){v.innerHTML=bannerLive()+newRoundCard();return;}
+  const rem=remainingMap(r);
+  v.innerHTML=`${bannerLive()}
+  <div class="card"><div class="stephead">步驟一　共 3 步</div>
+    <h2>本期戰利品 <span class="chip">${esc(r.name)}</span></h2>
+    <p class="hint">確認這次要分配的稀有物品與數量。用申請＋銀兩買的（荷塘風光、寶石禮袋等）不用登記。</p>
+    ${(r.loot||[]).length?`<div>${r.loot.map(l=>`<div class="lootrow">
+        <span class="nm">${iconFor(l.item)} ${esc(l.item)}</span>
+        ${canWrite?`<input type="number" min="0" value="${l.total}" data-total="${esc(l.item)}"><button class="btn sm" data-act="setTotal" data-item="${esc(l.item)}">改</button><button class="btn sm" data-act="delLoot" data-item="${esc(l.item)}">刪</button>`:`<span class="rem tnum">${l.total}</span>`}
+      </div>`).join("")}</div>`:`<p class="empty">尚未登記戰利品</p>`}
+    ${canWrite?`<div class="row" style="margin-top:14px">
+      <input list="itemlist" id="newLootName" type="text" placeholder="物品名稱" style="flex:1 1 150px">
+      <datalist id="itemlist">${COMMON_ITEMS.map(i=>`<option value="${esc(i)}">`).join("")}</datalist>
+      <input type="number" id="newLootQty" min="1" value="1"><button class="btn primary" data-act="addLoot">新增</button>
+    </div>`:""}
+  </div>
+  <div class="next"><button class="btn jade big" data-act="go" data-to="step2">下一步：上傳資料 →</button></div>`;
+}
+
+function upBlock(key,label,desc,tag,del){
+  const u=upUI[key]||{};let body="";
+  if(u.status==="loading")body=`<div class="st"><span class="spin"></span>辨識中…（第一次會請你允許使用 Claude，約數秒～數十秒）</div>`;
+  else if(u.status==="saved")body=`<div class="st ok">✓ 已儲存。可重新上傳覆蓋。</div>`;
+  else if(u.status==="err")body=`<div class="st err">${esc(u.msg||"失敗")}</div>`;
+  else if(u.status==="done"){
+    if(key==="contrib"){body=`<div class="st ok">對到 ${u.contrib.length} 位家族成員${u.dropped?`，已排除非家族 ${u.dropped} 筆`:""}</div><div class="preview"><ol>${u.contrib.map(x=>`<li>${esc(x.name)}　<span class="muted tnum">${fmt(x.score)}</span></li>`).join("")}</ol></div><div class="row" style="margin-top:10px"><button class="btn primary" data-act="confirmUp" data-key="${key}">確認儲存</button><button class="btn" data-act="redoUp" data-key="${key}">重來</button></div>`;}
+    else{body=`<div class="st ok">對到 ${u.names.length} 位家族成員（已依名次）${u.dropped?`，排除非家族 ${u.dropped} 筆`:""}</div><div class="preview"><ol>${u.names.map(n=>`<li>${esc(n)}</li>`).join("")}</ol></div><div class="row" style="margin-top:10px"><button class="btn primary" data-act="confirmUp" data-key="${key}">確認儲存</button><button class="btn" data-act="redoUp" data-key="${key}">重來</button></div>`;}
+  } else {
+    body=`${canWrite?`<div class="dropz" data-act="pick" data-key="${key}"><b>📷 上傳截圖</b>（可多張）<div class="muted" style="font-size:12px;margin-top:3px">我會自動辨識並排除其他家族</div></div>`:`<div class="st err">此裝置不支援照片辨識，請用下方貼上文字。</div>`}
+    <details class="paste"><summary>或改貼文字</summary><label class="fld" style="margin-top:8px">${key==="contrib"?"每行：名字 分數":"每行一個名字（由名次高到低）"}<textarea id="pz_${key}" placeholder="${key==="contrib"?"昭汪汪 114950":"第一名的名字\n第二名的名字"}"></textarea></label><button class="btn sm" data-act="pasteUp" data-key="${key}" style="margin-top:6px">辨識文字</button></details>`;
+  }
+  return `<div class="up"><h3>${esc(label)} ${tag?`<span class="tag">${esc(tag)}</span>`:""}${del&&canWrite?` <button class="btn sm" data-act="delAct" data-key="${esc(key)}" style="margin-left:auto">刪除活動</button>`:""}</h3><div class="muted" style="font-size:12.5px;margin:2px 0 4px">${esc(desc)}</div>${body}</div>`;
+}
+function renderStep2(){
+  const r=activeRound(),v=$("#view");
+  if(!r){v.innerHTML=bannerLive()+newRoundCard();return;}
+  const c=r.contributions||{},acts=r.activities||{};
+  const cCount=Object.keys(c).length,alist=actList(r);
+  v.innerHTML=`${bannerLive()}
+  <div class="card"><div class="stephead">步驟二　共 3 步</div>
+    <h2>上傳本期資料</h2>
+    <p class="hint">上傳截圖，我幫你辨識並<b>自動排除其他家族的人</b>。活動只看名次、不看分數。</p>
+    <div class="row" style="gap:16px;margin-bottom:6px">
+      <div><span class="muted" style="font-size:12px">貢獻</span> <b>${cCount}</b> 筆</div>
+      ${alist.map(k=>`<div><span class="muted" style="font-size:12px">${esc(k)}</span> <b>${(acts[k]||[]).length}</b> 名</div>`).join("")}
+    </div>
+    ${upBlock("contrib","家族貢獻度","家族貢獻截圖（計分數）","計分")}
+    ${alist.map(k=>upBlock(k,k+" 排名","活動排名，只計名次"+(ACTS.indexOf(k)<0?"（自訂）":""),"只計名次",ACTS.indexOf(k)<0)).join("")}
+    ${canWrite?`<div class="up" style="border-style:dashed"><h3>➕ 新增其他活動</h3><div class="muted" style="font-size:12.5px;margin:2px 0 6px">加入其他活動排名，一樣只計名次、自動排除外家族。</div><div class="row"><input type="text" id="newActName" placeholder="活動名稱，例：跨服聯賽" style="flex:1 1 160px"><button class="btn primary" data-act="addAct">新增活動</button></div></div>`:""}
+  </div>
+  <div class="next"><button class="btn jade big" data-act="go" data-to="step3">下一步：開始分配 →</button></div>`;
+}
+
+function renderStep3(){
+  const r=activeRound(),v=$("#view");
+  if(!r){v.innerHTML=bannerLive()+newRoundCard();return;}
+  const rem=remainingMap(r),allocs=allocOf(r.id),wishes=wishOf(r.id);
+  const scored=computeScores(r),tiers=tiersFrom(scored),alist=actList(r);
+  const totalItems=(r.loot||[]).reduce((s,l)=>s+Number(l.total||0),0),givenItems=allocs.reduce((s,a)=>s+Number(a.qty||0),0);
+  const shortItems=(r.loot||[]).filter(l=>(rem[l.item]??0)<=0);
+  const remOpts=(r.loot||[]).filter(l=>(rem[l.item]??0)>0);
+  v.innerHTML=`${bannerLive()}
+  <div class="card"><div class="stephead">步驟三　共 3 步</div>
+    <h2>本期分配 <span class="chip">${esc(r.name)}</span></h2>
+    <div class="kpi" style="margin:8px 0"><div><div class="b tnum">${fmt(givenItems)}<span class="muted" style="font-size:15px">/${fmt(totalItems)}</span></div><div class="l">已分 / 總件數</div></div><div><div class="b tnum">${new Set(allocs.map(a=>a.member)).size}</div><div class="l">已分到人數</div></div></div>
+    ${shortItems.length?`<div class="warnbar">⚠ 已分完：${shortItems.map(l=>esc(l.item)+"（剩"+(rem[l.item]??0)+"）").join("、")}</div>`:""}
+    <div class="stock">${(r.loot||[]).length?r.loot.map(l=>{const left=rem[l.item]??l.total;return `<div class="spill ${left<=0?'zero':''}"><div class="in">${iconFor(l.item)} ${esc(l.item)}</div><div class="iq tnum">${left}<small> /${l.total}</small></div></div>`;}).join(""):'<span class="muted">尚未登記戰利品（回步驟一）</span>'}</div>
+  </div>
+  <div class="card"><h2>✍️ 我要許願</h2>
+    <p class="hint">選你的名字和想要的戰利品，送出後委託人分配時就看得到。可許願多個。</p>
+    <div class="row">
+      <select id="wishWho"><option value="">選你的名字</option>${scored.map(x=>`<option>${esc(x.name)}</option>`).join("")}</select>
+      <select id="wishWhat"><option value="">選想要的物品</option>${((r.loot||[]).length?r.loot.map(l=>l.item):COMMON_ITEMS).map(it=>`<option>${esc(it)}</option>`).join("")}</select>
+      <button class="btn jade" data-act="memberWish">送出許願</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>依綜合表現發放</h2>
+    <p class="hint">綜合＝貢獻積分＋活動積分（夢域/藥田/盛會名次平均）。排名牌紅＝建議 3 份。用右側下拉選物品即發放，數量自動 −1。</p>
+    ${scored.map((x,i)=>{
+      const myW=wishes.filter(w=>w.member===x.name),myA=allocs.filter(a=>a.member===x.name);
+      const tier=tiers[x.name]||0,m=state.roster.find(z=>z.name===x.name)||{};
+      const wantSel=false;
+      return `<div class="mcard">
+        <div class="mtop">
+          <div class="mrank ${tier===3?'top':''}">${i+1}</div>
+          <div class="minfo">
+            <div class="mn">${esc(x.name)} ${roleChip(x.role)} <span class="tierbadge t${tier}">建議 ${tier||"–"}</span></div>
+            <div class="mm"><span>綜合 <span class="score">${x.composite.toFixed(0)}</span></span><span>貢獻 ${fmt(x.cv)}</span>${alist.map(k=>x.rank[k]?`<span class="arank">${esc(k.slice(0,2))}#${x.rank[k]}</span>`:"").join("")}<span>已拿 ${myA.reduce((s,a)=>s+a.qty,0)}</span></div>
+          </div>
+          ${canWrite?`<div class="give">${remOpts.length?`<select data-giveto="${esc(x.name)}"><option value="">＋發放物品</option>${remOpts.map(l=>`<option value="${esc(l.item)}">${iconFor(l.item)} ${esc(l.item)}（剩${rem[l.item]}）</option>`).join("")}</select>`:`<span class="muted" style="font-size:12px">已無庫存</span>`}</div>`:""}
+        </div>
+        ${(myW.length||myA.length||canWrite)?`<div class="mchips">
+          ${myW.length?`<span class="lbl">許願</span>${myW.map(w=>`<span class="chip wish">${iconFor(w.item)} ${esc(w.item)}${canWrite?` <span class="del" data-act="delWish" data-id="${w.id}">✕</span>`:""}</span>`).join("")}`:""}
+          ${myA.length?`<span class="lbl">已拿</span>${myA.map(a=>`<span class="chip got">${iconFor(a.item)} ${esc(a.item)}${canWrite?` <span class="del" data-act="delAlloc" data-id="${a.id}">✕</span>`:""}</span>`).join("")}`:""}
+          ${canWrite?`<select data-wishfor="${esc(x.name)}"><option value="">＋許願</option>${COMMON_ITEMS.map(it=>`<option>${esc(it)}</option>`).join("")}</select>`:""}
+        </div>`:""}
+      </div>`;
+    }).join("")}
+  </div>
+  <div class="card"><h2>產生分配清單</h2><p class="hint">複製貼到家族社群公告。</p>
+    <div class="row"><button class="btn primary" data-act="exportAnn">產生清單</button>${canWrite?`<button class="btn" data-act="archive">封存本期</button>`:""}</div>
+    <div id="annWrap"></div></div>`;
+}
+
+function renderRoster(){
+  const v=$("#view"),c=(activeRound()||{}).contributions||{};
+  const byRole={};ROLE_ORDER.forEach(r=>byRole[r]=[]);state.roster.forEach(m=>{(byRole[m.role]||(byRole[m.role]=[])).push(m);});
+  const normal=state.roster.filter(m=>m.status==="正常").length,ghost=state.roster.length-normal;
+  v.innerHTML=`${bannerLive()}<div class="card"><h2>成員名單 <span class="chip">${state.roster.length} 人</span></h2>
+    <div class="kpi" style="margin-top:8px"><div><div class="b tnum">${normal}</div><div class="l">正常（可分配）</div></div><div><div class="b tnum">${ghost}</div><div class="l">幽靈（不分配）</div></div></div>
+    <p class="hint" style="margin-top:12px">${canWrite?"點「切換」把長期不活躍的人設為幽靈，分配時就不會出現。":"唯讀檢視。"}</p></div>
+  ${ROLE_ORDER.filter(role=>byRole[role]&&byRole[role].length).map(role=>`<div class="card"><h2 style="font-size:16px">${roleChip(role)} <span class="muted" style="font-weight:400;font-size:13px">${byRole[role].length} 人</span></h2>
+    <div class="tablewrap" style="margin-top:8px"><table><tbody>${byRole[role].map(m=>`<tr><td class="name"><span class="statusdot ${m.status==="幽靈"?"g":""}"></span>${esc(m.name)}</td><td class="tnum muted">貢獻 ${fmt(c[m.name]||0)}</td><td style="text-align:right">${m.status==="幽靈"?'<span class="chip">幽靈</span>':'<span class="chip wish">正常</span>'}${canWrite?` <button class="btn sm" data-act="toggleGhost" data-name="${esc(m.name)}" style="margin-left:6px">切換</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>`).join("")}`;
+}
+function renderHistory(){
+  const v=$("#view");const rounds=Object.entries(state.rounds).map(([id,r])=>({id,...r})).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const tally={};state.allocs.forEach(a=>{const t=tally[a.member]||(tally[a.member]={qty:0,rounds:new Set()});t.qty+=Number(a.qty||0);t.rounds.add(a.roundId);});
+  const trows=Object.entries(tally).map(([name,t])=>({name,qty:t.qty,rounds:t.rounds.size})).sort((a,b)=>b.qty-a.qty);
+  v.innerHTML=`${bannerLive()}<div class="card"><h2>每人累計拿取</h2><p class="hint">所有分配期加總；拿多的人下次可優先讓給拿少的。</p>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>成員</th><th class="tnum">累計件數</th><th class="tnum">參與期數</th></tr></thead><tbody>${trows.length?trows.map((x,i)=>`<tr><td class="muted tnum">${i+1}</td><td class="name">${esc(x.name)}</td><td class="tnum">${x.qty}</td><td class="tnum">${x.rounds}</td></tr>`).join(""):'<tr><td colspan="4" class="empty">尚無紀錄</td></tr>'}</tbody></table></div></div>
+  ${rounds.map(r=>{const al=allocOf(r.id);return `<div class="card"><h2 style="font-size:16px">${esc(r.name)} <span class="chip">${esc(r.date||"")}</span> ${r.status==="已封存"?'<span class="chip">已封存</span>':'<span class="chip wish">進行中</span>'}</h2>${al.length?`<div class="tablewrap" style="margin-top:8px"><table><tbody>${Object.entries(al.reduce((o,a)=>{(o[a.member]=o[a.member]||[]).push(a.item);return o;},{})).map(([mem,items])=>`<tr><td class="name">${esc(mem)}</td><td>${items.map(i=>`<span class="chip got">${iconFor(i)} ${esc(i)}</span>`).join(" ")}</td></tr>`).join("")}</tbody></table></div>`:'<p class="empty">此期尚未分配</p>'}</div>`;}).join("")}`;
+}
+function renderHelp(){
+  const v=$("#view");
+  v.innerHTML=`<div class="banner info"><div><b>三步驟</b>　① 確認戰利品　② 上傳截圖（自動排除別家族）　③ 依綜合表現分配、產生清單。</div></div>
+  <div class="card"><h2>流程說明</h2>
+    <details class="help" open><summary>① 本期戰利品</summary><p>建立分配期，輸入這次的稀有物品與數量。</p></details>
+    <details class="help"><summary>② 上傳資料</summary><p>上傳「家族貢獻」「夢域尋光」「搶占藥田」「家族盛會」截圖（可多張）。我辨識後只保留名單上的家族成員，其他家族自動排除。貢獻計分數，活動只計名次。第一次會請你允許使用 Claude 辨識。沒辦法辨識時可改貼文字。</p></details>
+    <details class="help"><summary>③ 本期分配</summary><p>系統算出每人<b>綜合分</b>（貢獻＋活動名次）並排名，建議前⅓給3份、次⅓給2份、其餘1份。用成員右側<b>下拉選單</b>選物品即發放，庫存自動 −1；分完變紅字、下拉不再出現該物品。按「產生清單」複製公告，分完「封存本期」進歷史。</p></details>
+  </div>
+  <div class="card"><h2>想讓成員免帳號自己許願？</h2><p class="hint">目前共享資料庫只對有 Claude 帳號、被授權的人開放。要讓全家族不用帳號自己許願，需另外做網站版。</p></div>`;
+}
+
+/* ---------- 事件 ---------- */
+$("#tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return;activeTab=b.dataset.tab;[...$("#tabs").children].forEach(t=>t.setAttribute("aria-selected",t===b));render();window.scrollTo(0,0);});
+$("#fileInput").addEventListener("change",e=>{const f=e.target.files;e.target.value="";handleFiles(f);});
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act]");if(!el)return;const act=el.dataset.act;
+  if(act==="go"){activeTab=el.dataset.to;[...$("#tabs").children].forEach(t=>t.setAttribute("aria-selected",t.dataset.tab===activeTab));render();window.scrollTo(0,0);return;}
+  if(act==="pick"){pendingUpKey=el.dataset.key;$("#fileInput").click();return;}
+  if(act==="confirmUp")return confirmUpload(el.dataset.key);
+  if(act==="redoUp"){upUI[el.dataset.key]={};return render();}
+  if(act==="pasteUp"){const t=$("#pz_"+el.dataset.key);return importPaste(el.dataset.key,t?t.value:"");}
+  if(act==="addAct"){const n=$("#newActName")?$("#newActName").value.trim():"";return addActivity(n);}
+  if(act==="delAct")return delActivity(el.dataset.key);
+  if(act==="createRound"){const n=$("#nrName").value.trim(),d=$("#nrDate").value.trim()||new Date().toISOString().slice(0,10);return createRound(n,d);}
+  if(act==="addLoot"){const n=$("#newLootName").value.trim(),q=$("#newLootQty").value;if(!n)return toast("請輸入物品名稱",true);return addLoot(n,q);}
+  if(act==="setTotal"){const it=el.dataset.item,inp=document.querySelector(`[data-total="${CSS.escape(it)}"]`);return setLootTotal(it,inp.value);}
+  if(act==="delLoot")return delLoot(el.dataset.item);
+  if(act==="toggleGhost")return toggleGhost(el.dataset.name);
+  if(act==="delWish")return delWish(el.dataset.id);
+  if(act==="delAlloc")return delAlloc(el.dataset.id);
+  if(act==="archive")return archiveActive();
+  if(act==="memberWish"){const w=$("#wishWho"),i=$("#wishWhat");if(!w.value||!i.value)return toast("請選名字和物品",true);const nm=w.value,it=i.value;w.value="";i.value="";return addWish(nm,it);}
+  if(act==="exportAnn")return exportAnnouncement();
+});
+document.addEventListener("change",e=>{
+  const g=e.target.closest("[data-giveto]");if(g&&g.value){const m=g.dataset.giveto,it=g.value;g.value="";addAlloc(m,it);return;}
+  const w=e.target.closest("[data-wishfor]");if(w&&w.value){const m=w.dataset.wishfor,it=w.value;w.value="";addWish(m,it);}
+});
+function exportAnnouncement(){
+  const r=activeRound();if(!r)return;const al=allocOf(r.id);
+  const by=al.reduce((o,a)=>{(o[a.member]=o[a.member]||[]).push(a.item);return o;},{});
+  let txt=`【${r.name}　戰利品分配】\n`;const order=state.roster.map(m=>m.name);
+  Object.keys(by).sort((a,b)=>order.indexOf(a)-order.indexOf(b)).forEach(m=>{txt+=`${m}：${by[m].join("、")}\n`;});
+  if(!al.length)txt+="（本期尚未分配）\n";
+  $("#annWrap").innerHTML=`<label class="fld" style="margin-top:12px">分配清單<textarea id="annText" readonly style="min-height:120px">${esc(txt)}</textarea></label><button class="btn primary sm" id="copyAnn">複製</button>`;
+  $("#copyAnn").onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast("已複製");}catch(e){const ta=$("#annText");ta.focus();ta.select();toast("請手動複製（已選取）");}};
+}
+
+render();
+connect();
+</script>
