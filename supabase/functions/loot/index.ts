@@ -82,7 +82,14 @@ Deno.serve(async (req) => {
       const { path, data } = body;
       if (path === "app/roster") {
         const members = data.members || [];
+        const names = members.map((m: any) => m.name).filter((n: any) => !!n);
         await sql.begin(async (tx) => {
+          // 移除不在這次名單中的成員（支援刪除）
+          if (names.length) {
+            await tx`delete from loot.members where name <> all(${names})`;
+          } else {
+            await tx`delete from loot.members`;
+          }
           for (let i = 0; i < members.length; i++) {
             const m = members[i];
             await tx`insert into loot.members(name,role,status,ord) values(${m.name},${m.role || "普通成員"},${m.status || "正常"},${i + 1})
@@ -104,6 +111,16 @@ Deno.serve(async (req) => {
         return json({ ok: true });
       }
       return json({ error: "bad_path" }, 400);
+    }
+
+    if (a === "resetRound") {
+      if (!(await auth(body))) return json({ error: "unauthorized" }, 401);
+      const id = body.roundId;
+      if (!id) return json({ error: "missing" }, 400);
+      await sql`update loot.rounds set contributions='{}'::jsonb, activities='{}'::jsonb, activity_list='[]'::jsonb where id=${id}`;
+      await sql`delete from loot.wishes where round_id=${id}`;
+      await sql`delete from loot.allocations where round_id=${id}`;
+      return json({ ok: true });
     }
 
     if (a === "ocr") {
