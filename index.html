@@ -292,6 +292,7 @@ function subscribe(){
 /* ---------- 寫入 ---------- */
 async function saveRoster(){await DB.doc("app/roster").set({members:state.roster});}
 async function toggleGhost(name){const m=state.roster.find(x=>x.name===name);if(!m)return;m.status=m.status==="幽靈"?"正常":"幽靈";await guardWrite(async()=>{await saveRoster();toast(m.name+" → "+m.status);});}
+async function delMember(name){const m=state.roster.find(x=>x.name===name);if(!m)return;if(!confirm("確定把「"+name+"」從名單移除？\n\n（若只是暫時不分配，建議改用「切換」設為幽靈即可。）"))return;state.roster=state.roster.filter(x=>x.name!==name);await guardWrite(async()=>{await saveRoster();toast("已移除 "+name);});}
 async function addMember(name,role){name=(name||"").trim();if(!name){toast("請輸入名字",true);return;}if(state.roster.some(m=>m.name===name)){toast("「"+name+"」已在名單中",true);return;}state.roster.push({name,role:role||"普通成員",status:"正常"});await guardWrite(async()=>{await saveRoster();toast("已新增 "+name);});}
 async function addMembers(list){const add=(list||[]).filter(x=>x.name&&!state.roster.some(m=>m.name===x.name));if(!add.length){toast("沒有可新增的成員",true);return;}add.forEach(x=>state.roster.push({name:x.name,role:x.role||"普通成員",status:"正常"}));upUI.roster=null;await guardWrite(async()=>{await saveRoster();toast("已新增 "+add.length+" 位成員");});}
 async function rosterFiles(files){upUI.roster={status:"loading"};render();try{const raw=await runOCR("roster",files);const seen=new Set(),cands=[];(Array.isArray(raw)?raw:[]).forEach(n=>{n=String(n||"").trim();if(n&&!seen.has(n)){seen.add(n);cands.push(n);}});upUI.roster={status:"done",cands};render();}catch(e){console.error(e);upUI.roster={status:"err",msg:sampleErr(e&&e.code)};render();toast(sampleErr(e&&e.code),true);}}
@@ -492,7 +493,7 @@ function renderRoster(){
     ${rosterReview()}
   </div>`:""}
   ${ROLE_ORDER.filter(role=>byRole[role]&&byRole[role].length).map(role=>`<div class="card"><h2 style="font-size:16px">${roleChip(role)} <span class="muted" style="font-weight:400;font-size:13px">${byRole[role].length} 人</span></h2>
-    <div class="tablewrap" style="margin-top:8px"><table><tbody>${byRole[role].map(m=>`<tr><td class="name"><span class="statusdot ${m.status==="幽靈"?"g":""}"></span>${esc(m.name)}</td><td class="tnum muted">貢獻 ${fmt(c[m.name]||0)}</td><td style="text-align:right">${m.status==="幽靈"?'<span class="chip">幽靈</span>':'<span class="chip wish">正常</span>'}${canWrite?` <button class="btn sm" data-act="toggleGhost" data-name="${esc(m.name)}" style="margin-left:6px">切換</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>`).join("")}`;
+    <div class="tablewrap" style="margin-top:8px"><table><tbody>${byRole[role].map(m=>`<tr><td class="name"><span class="statusdot ${m.status==="幽靈"?"g":""}"></span>${esc(m.name)}</td><td class="tnum muted">貢獻 ${fmt(c[m.name]||0)}</td><td style="text-align:right">${m.status==="幽靈"?'<span class="chip">幽靈</span>':'<span class="chip wish">正常</span>'}${canWrite?` <button class="btn sm" data-act="toggleGhost" data-name="${esc(m.name)}" style="margin-left:6px">切換</button> <button class="btn sm" data-act="delMember" data-name="${esc(m.name)}" style="margin-left:4px;color:var(--accent)">刪除</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>`).join("")}`;
 }
 function renderHistory(){
   const v=$("#view");const rounds=Object.entries(state.rounds).map(([id,r])=>({id,...r})).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
@@ -532,6 +533,7 @@ document.addEventListener("click",e=>{
   if(act==="setTotal"){const it=el.dataset.item,inp=document.querySelector(`[data-total="${CSS.escape(it)}"]`);return setLootTotal(it,inp.value);}
   if(act==="delLoot")return delLoot(el.dataset.item);
   if(act==="toggleGhost")return toggleGhost(el.dataset.name);
+  if(act==="delMember")return delMember(el.dataset.name);
   if(act==="addMember"){const n=$("#newMemName"),r=$("#newMemRole");const nm=(n.value||"").trim();if(!nm)return toast("請輸入名字",true);const role=r?r.value:"普通成員";n.value="";return addMember(nm,role);}
   if(act==="pasteRoster"){const t=$("#pz_roster");return rosterPaste(t?t.value:"");}
   if(act==="rosterAddOne"){const nm=el.dataset.name,sel=document.querySelector(`[data-memrole="${CSS.escape(nm)}"]`);return addMember(nm,sel?sel.value:"普通成員");}
