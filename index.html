@@ -242,6 +242,7 @@ async function api(action,extra){
   const res=await fetch(API_BASE,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(Object.assign({action,pass:MGR_PASS},extra||{}))});
   let j={};try{j=await res.json();}catch(e){}
   if(!res.ok){if(res.status===401){MGR_PASS="";try{localStorage.removeItem("loot_pass")}catch(e){}canWrite=false;updateRolePill();toast("委託人密碼錯誤，請重新登入",true);}throw (j&&j.error)||("http"+res.status);}
+  if(action!=="state"&&action!=="checkPass"&&action!=="ocr")setTimeout(pull,150);
   return j;
 }
 const _docCb={},_collCb={};
@@ -249,8 +250,10 @@ const DBSHIM={
   doc:(path)=>({set:(data)=>api("setDoc",{path,data}),delete:()=>api("delDoc",{path}),onSnapshot:(cb)=>{_docCb[path]=cb;return ()=>{delete _docCb[path]};}}),
   collection:(coll)=>({add:(data)=>api("addDoc",{coll,data}),onSnapshot:(cb)=>{_collCb[coll]=cb;return ()=>{delete _collCb[coll]};}})
 };
+let _lastJson="";
 async function pull(){
   let st;try{st=await api("state");}catch(e){return;}
+  const _j=JSON.stringify(st);if(_j===_lastJson)return;_lastJson=_j;
   if(_docCb["app/roster"])_docCb["app/roster"]({data:()=>({members:st.roster})});
   if(_docCb["app/config"])_docCb["app/config"]({data:()=>st.config});
   if(_collCb["rounds"])_collCb["rounds"]({docs:Object.entries(st.rounds).map(([id,d])=>({id,data:()=>d}))});
