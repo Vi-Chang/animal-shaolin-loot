@@ -292,6 +292,19 @@ function subscribe(){
 /* ---------- 寫入 ---------- */
 async function saveRoster(){await DB.doc("app/roster").set({members:state.roster});}
 async function toggleGhost(name){const m=state.roster.find(x=>x.name===name);if(!m)return;m.status=m.status==="幽靈"?"正常":"幽靈";await guardWrite(async()=>{await saveRoster();toast(m.name+" → "+m.status);});}
+async function addMember(name,role){name=(name||"").trim();if(!name){toast("請輸入名字",true);return;}if(state.roster.some(m=>m.name===name)){toast("「"+name+"」已在名單中",true);return;}state.roster.push({name,role:role||"普通成員",status:"正常"});await guardWrite(async()=>{await saveRoster();toast("已新增 "+name);});}
+async function addMembers(list){const add=(list||[]).filter(x=>x.name&&!state.roster.some(m=>m.name===x.name));if(!add.length){toast("沒有可新增的成員",true);return;}add.forEach(x=>state.roster.push({name:x.name,role:x.role||"普通成員",status:"正常"}));upUI.roster=null;await guardWrite(async()=>{await saveRoster();toast("已新增 "+add.length+" 位成員");});}
+async function rosterFiles(files){upUI.roster={status:"loading"};render();try{const raw=await runOCR("roster",files);const seen=new Set(),cands=[];(Array.isArray(raw)?raw:[]).forEach(n=>{n=String(n||"").trim();if(n&&!seen.has(n)){seen.add(n);cands.push(n);}});upUI.roster={status:"done",cands};render();}catch(e){console.error(e);upUI.roster={status:"err",msg:sampleErr(e&&e.code)};render();toast(sampleErr(e&&e.code),true);}}
+function rosterPaste(text){if(!text||!text.trim()){toast("請先貼上名字",true);return;}const seen=new Set(),cands=[];text.split(/\n+/).forEach(line=>{const n=line.trim();if(n&&!seen.has(n)){seen.add(n);cands.push(n);}});upUI.roster={status:"done",cands};render();}
+function rosterReview(){const u=upUI.roster;if(!u)return "";
+  if(u.status==="loading")return `<div class="st" style="margin-top:10px"><span class="spin"></span>辨識中…（約數秒～數十秒）</div>`;
+  if(u.status==="err")return `<div class="st err" style="margin-top:10px">${esc(u.msg||"失敗")}</div>`;
+  if(u.status==="done"){const cands=(u.cands||[]).filter(n=>!state.roster.some(m=>m.name===n));
+    if(!cands.length)return `<div class="st ok" style="margin-top:10px">沒有新成員（名單裡都有了）<button class="btn sm" data-act="rosterClear" style="margin-left:8px">關閉</button></div>`;
+    return `<div class="st ok" style="margin-top:10px">找到 ${cands.length} 位還沒在名單上的人，選好身分後加入：</div>
+    <div class="tablewrap" style="margin-top:6px"><table><tbody>${cands.map(n=>`<tr><td class="name">${esc(n)}</td><td><select data-memrole="${esc(n)}">${ROLE_ORDER.map(r=>`<option${r==="普通成員"?" selected":""}>${esc(r)}</option>`).join("")}</select></td><td style="text-align:right"><button class="btn sm primary" data-act="rosterAddOne" data-name="${esc(n)}">加入</button></td></tr>`).join("")}</tbody></table></div>
+    <div class="row" style="margin-top:8px"><button class="btn primary" data-act="rosterAddAll">全部加入</button><button class="btn" data-act="rosterClear">取消</button></div>`;}
+  return "";}
 async function saveRound(id,patch){const r=state.rounds[id]||{};await DB.doc("rounds/"+id).set({...r,...patch});}
 async function createRound(name,dateStr){const id="r"+Date.now();await guardWrite(async()=>{await DB.doc("rounds/"+id).set({name:name||("分配期 "+dateStr),date:dateStr,status:"進行中",loot:[],contributions:{},activities:{}});await DB.doc("app/config").set({...state.config,activeRoundId:id});toast("已建立："+(name||dateStr));});}
 async function archiveActive(){const r=activeRound();if(!r)return;await guardWrite(async()=>{await saveRound(r.id,{status:"已封存"});await DB.doc("app/config").set({...state.config,activeRoundId:null});toast("本期已封存");});}
@@ -317,6 +330,7 @@ async function runOCR(key,files){
 }
 async function handleFiles(files){
   const key=pendingUpKey;pendingUpKey=null;if(!key||!files||!files.length)return;
+  if(key==="roster")return rosterFiles(files);
   upUI[key]={status:"loading"};render();
   try{
     const raw=await runOCR(key,files);
@@ -466,6 +480,17 @@ function renderRoster(){
   v.innerHTML=`${bannerLive()}<div class="card"><h2>成員名單 <span class="chip">${state.roster.length} 人</span></h2>
     <div class="kpi" style="margin-top:8px"><div><div class="b tnum">${normal}</div><div class="l">正常（可分配）</div></div><div><div class="b tnum">${ghost}</div><div class="l">幽靈（不分配）</div></div></div>
     <p class="hint" style="margin-top:12px">${canWrite?"點「切換」把長期不活躍的人設為幽靈，分配時就不會出現。":"唯讀檢視。"}</p></div>
+  ${canWrite?`<div class="card"><h2 style="font-size:16px">➕ 新增成員</h2>
+    <p class="hint">新進夥伴可直接手動輸入，或上傳成員截圖自動辨識。</p>
+    <div class="row" style="margin-top:6px">
+      <input type="text" id="newMemName" placeholder="成員名字" style="flex:1 1 150px">
+      <select id="newMemRole">${ROLE_ORDER.map(r=>`<option${r==="普通成員"?" selected":""}>${esc(r)}</option>`).join("")}</select>
+      <button class="btn primary" data-act="addMember">新增</button>
+    </div>
+    <div class="dropz" data-act="pick" data-key="roster" style="margin-top:12px"><b>📷 上傳成員截圖</b>（可多張）<div class="muted" style="font-size:12px;margin-top:3px">自動讀取名字，挑出名單上還沒有的人</div></div>
+    <details class="paste" style="margin-top:8px"><summary>或改貼文字（每行一個名字）</summary><label class="fld" style="margin-top:8px"><textarea id="pz_roster" placeholder="新成員一\n新成員二"></textarea></label><button class="btn sm" data-act="pasteRoster" style="margin-top:6px">讀取名字</button></details>
+    ${rosterReview()}
+  </div>`:""}
   ${ROLE_ORDER.filter(role=>byRole[role]&&byRole[role].length).map(role=>`<div class="card"><h2 style="font-size:16px">${roleChip(role)} <span class="muted" style="font-weight:400;font-size:13px">${byRole[role].length} 人</span></h2>
     <div class="tablewrap" style="margin-top:8px"><table><tbody>${byRole[role].map(m=>`<tr><td class="name"><span class="statusdot ${m.status==="幽靈"?"g":""}"></span>${esc(m.name)}</td><td class="tnum muted">貢獻 ${fmt(c[m.name]||0)}</td><td style="text-align:right">${m.status==="幽靈"?'<span class="chip">幽靈</span>':'<span class="chip wish">正常</span>'}${canWrite?` <button class="btn sm" data-act="toggleGhost" data-name="${esc(m.name)}" style="margin-left:6px">切換</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>`).join("")}`;
 }
@@ -507,6 +532,11 @@ document.addEventListener("click",e=>{
   if(act==="setTotal"){const it=el.dataset.item,inp=document.querySelector(`[data-total="${CSS.escape(it)}"]`);return setLootTotal(it,inp.value);}
   if(act==="delLoot")return delLoot(el.dataset.item);
   if(act==="toggleGhost")return toggleGhost(el.dataset.name);
+  if(act==="addMember"){const n=$("#newMemName"),r=$("#newMemRole");const nm=(n.value||"").trim();if(!nm)return toast("請輸入名字",true);const role=r?r.value:"普通成員";n.value="";return addMember(nm,role);}
+  if(act==="pasteRoster"){const t=$("#pz_roster");return rosterPaste(t?t.value:"");}
+  if(act==="rosterAddOne"){const nm=el.dataset.name,sel=document.querySelector(`[data-memrole="${CSS.escape(nm)}"]`);return addMember(nm,sel?sel.value:"普通成員");}
+  if(act==="rosterAddAll"){const list=Array.from(document.querySelectorAll("[data-memrole]")).map(s=>({name:s.getAttribute("data-memrole"),role:s.value}));return addMembers(list);}
+  if(act==="rosterClear"){upUI.roster=null;return render();}
   if(act==="delWish")return delWish(el.dataset.id);
   if(act==="delAlloc")return delAlloc(el.dataset.id);
   if(act==="resetWeek")return resetWeek();
