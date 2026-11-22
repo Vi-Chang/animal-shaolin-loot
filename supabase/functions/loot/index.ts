@@ -1,10 +1,9 @@
 // 動物少林寺 戰利品分配 — 後端 Edge Function
 // 直連 Postgres（service role 等級），只碰 loot schema；不經 PostgREST，不動商業 API 設定。
-// 讀取(state)與成員許願(wishes)公開；其餘寫入與 OCR 需委託人密碼 MANAGER_PASS。
+// 讀取(state)與成員許願(wishes)公開；其餘寫入與 OCR 需委託人密碼（存於 loot.app_kv 'secret'）。
 import postgres from "npm:postgres@3.4.5";
 
 const DB = Deno.env.get("SUPABASE_DB_URL")!;
-const MANAGER_PASS = Deno.env.get("MANAGER_PASS") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const OCR_MODEL = Deno.env.get("OCR_MODEL") ?? "claude-sonnet-5-5";
 
@@ -18,12 +17,17 @@ const cors = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
+async function auth(body: any): Promise<boolean> {
+  const r = await sql`select v from loot.app_kv where k='secret'`;
+  const s: any = (r[0]?.v) || {};
+  return !!s.pass && body.pass === s.pass;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "bad_json" }, 400); }
   const a = body?.action;
-  const auth = () => !!MANAGER_PASS && body.pass === MANAGER_PASS;
 
   try {
     if (a === "state") {
@@ -48,7 +52,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (a === "checkPass") return json({ ok: auth() });
+    if (a === "checkPass") return json({ ok: await auth(body) });
 
     if (a === "addDoc") {
       const { coll, data } = body;
@@ -56,7 +60,7 @@ Deno.serve(async (req) => {
         await sql`insert into loot.wishes(round_id,member,item) values(${data.roundId},${data.member},${data.item})`;
         return json({ ok: true });
       }
-      if (!auth()) return json({ error: "unauthorized" }, 401);
+      if (!(await auth(body))) return json({ error: "unauthorized" }, 401);
       if (coll === "allocations") {
         await sql`insert into loot.allocations(round_id,member,item,qty) values(${data.roundId},${data.member},${data.item},${data.qty || 1})`;
         return json({ ok: true });
@@ -68,13 +72,13 @@ Deno.serve(async (req) => {
       const parts = String(body.path || "").split("/");
       const coll = parts[0], id = parts[1];
       if (coll === "wishes") { await sql`delete from loot.wishes where id=${id}`; return json({ ok: true }); }
-      if (!auth()) return json({ error: "unauthorized" }, 401);
+      if (!(await auth(body))) return json({ error: "unauthorized" }, 401);
       if (coll === "allocations") { await sql`delete from loot.allocations where id=${id}`; return json({ ok: true }); }
       return json({ error: "bad_path" }, 400);
     }
 
     if (a === "setDoc") {
-      if (!auth()) return json({ error: "unauthorized" }, 401);
+      if (!(await auth(body))) return json({ error: "unauthorized" }, 401);
       const { path, data } = body;
       if (path === "app/roster") {
         const members = data.members || [];
@@ -103,7 +107,7 @@ Deno.serve(async (req) => {
     }
 
     if (a === "ocr") {
-      if (!auth()) return json({ error: "unauthorized" }, 401);
+      if (!(await auth(body))) return json({ error: "unauthorized" }, 401);
       if (!ANTHROPIC_API_KEY) return json({ error: "no_key" }, 500);
       const { mode, images } = body;
       const prompt = mode === "rank"
