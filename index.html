@@ -288,6 +288,7 @@ async function toggleGhost(name){const m=state.roster.find(x=>x.name===name);if(
 async function saveRound(id,patch){const r=state.rounds[id]||{};await DB.doc("rounds/"+id).set({...r,...patch});}
 async function createRound(name,dateStr){const id="r"+Date.now();await guardWrite(async()=>{await DB.doc("rounds/"+id).set({name:name||("分配期 "+dateStr),date:dateStr,status:"進行中",loot:[],contributions:{},activities:{}});await DB.doc("app/config").set({...state.config,activeRoundId:id});toast("已建立："+(name||dateStr));});}
 async function archiveActive(){const r=activeRound();if(!r)return;await guardWrite(async()=>{await saveRound(r.id,{status:"已封存"});await DB.doc("app/config").set({...state.config,activeRoundId:null});toast("本期已封存");});}
+async function resetWeek(){const r=activeRound();if(!r)return;if(!confirm("重置本期統計？\n\n會清空：貢獻分數、三個活動名次、所有許願、所有分配結果。\n保留：戰利品清單、成員名單。\n\n此動作無法復原。"))return;try{await api("resetRound",{roundId:r.id});toast("本期統計已重置");await pull();render();}catch(e){toast("重置失敗，請稍後再試",true);}}
 async function addLoot(item,total){const r=activeRound();if(!r){toast("請先建立分配期",true);return;}item=(item||"").trim();total=Math.max(1,Number(total)||1);if(!item)return;const loot=(r.loot||[]).slice();const ex=loot.find(l=>l.item===item);if(ex)ex.total=Number(ex.total||0)+total;else loot.push({item,total});await guardWrite(async()=>{await saveRound(r.id,{loot});toast("入庫："+item+"×"+total);});}
 async function setLootTotal(item,total){const r=activeRound();if(!r)return;total=Math.max(0,Number(total)||0);await guardWrite(async()=>{await saveRound(r.id,{loot:(r.loot||[]).map(l=>l.item===item?{...l,total}:l)});});}
 async function delLoot(item){const r=activeRound();if(!r)return;await guardWrite(async()=>{await saveRound(r.id,{loot:(r.loot||[]).filter(l=>l.item!==item)});});}
@@ -444,7 +445,7 @@ function renderStep3(){
     }).join("")}
   </div>
   <div class="card"><h2>產生分配清單</h2><p class="hint">複製貼到家族社群公告。</p>
-    <div class="row"><button class="btn primary" data-act="exportAnn">產生清單</button>${canWrite?`<button class="btn" data-act="archive">封存本期</button>`:""}</div>
+    <div class="row"><button class="btn primary" data-act="exportAnn">產生清單</button>${canWrite?`<button class="btn" data-act="resetWeek">🔄 重置本期統計</button> <button class="btn" data-act="archive">封存本期</button>`:""}</div>
     <div id="annWrap"></div></div>`;
 }
 
@@ -496,6 +497,7 @@ document.addEventListener("click",e=>{
   if(act==="toggleGhost")return toggleGhost(el.dataset.name);
   if(act==="delWish")return delWish(el.dataset.id);
   if(act==="delAlloc")return delAlloc(el.dataset.id);
+  if(act==="resetWeek")return resetWeek();
   if(act==="archive")return archiveActive();
   if(act==="memberWish"){const w=$("#wishWho"),i=$("#wishWhat");if(!w.value||!i.value)return toast("請選名字和物品",true);const nm=w.value,it=i.value;w.value="";i.value="";return addWish(nm,it);}
   if(act==="exportAnn")return exportAnnouncement();
