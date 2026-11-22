@@ -130,6 +130,10 @@
   .tierbadge{font-weight:800;font-family:var(--font-head);border-radius:6px;padding:0 7px;color:#fff}
   .tierbadge.t3{background:var(--accent)} .tierbadge.t2{background:var(--gold)} .tierbadge.t1{background:var(--jade)} .tierbadge.t0{background:var(--surface2);color:var(--muted)}
   .give{flex:0 0 auto}
+  .give3{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:300px}
+  .give3 select{min-width:84px;flex:0 0 auto;font-size:12.5px;padding:6px 4px}
+  .give3 select.has{border-color:var(--jade);color:var(--jade);font-weight:700}
+  @media(max-width:560px){.give3{max-width:150px}.give3 select{min-width:70px}}
   .mchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
   .mchips .lbl{font-size:11px;color:var(--muted);font-weight:700}
   .want-tag{font-size:12px;color:var(--jade);font-weight:700}
@@ -300,6 +304,7 @@ async function addWish(member,item){if(!item||!member)return;const r=activeRound
 async function delWish(id){try{await DB.doc("wishes/"+id).delete();}catch(e){toast("刪除失敗",true);}}
 async function addAlloc(member,item){const r=activeRound();if(!r)return;const got=allocOf(r.id).filter(a=>a.member===member).reduce((s,a)=>s+Number(a.qty||0),0);if(got>=3){toast(member+" 已領滿 3 件（每人最多 3 個）",true);return;}const rem=remainingMap(r)[item]??0;if(rem<1){toast("「"+item+"」已分完，數量不夠！",true);return;}await guardWrite(async()=>{await DB.collection("allocations").add({roundId:r.id,member,item,qty:1,ts:Date.now()});toast("✓ "+item+" → "+member+"，剩 "+(rem-1));});}
 async function delAlloc(id){await guardWrite(async()=>{await DB.doc("allocations/"+id).delete();});}
+async function changeSlot(member,allocid,item){const r=activeRound();if(!r)return;if(!allocid&&!item)return;await guardWrite(async()=>{if(allocid)await DB.doc("allocations/"+allocid).delete();if(item)await DB.collection("allocations").add({roundId:r.id,member,item,qty:1,ts:Date.now()});toast(item?("✓ "+item+" → "+member):(member+" 已清除一格"));});}
 
 /* ---------- 影像辨識（排除非家族） ---------- */
 function sampleErr(c){return({not_granted:"你尚未允許使用 Claude 辨識",rate_limited:"用量達上限，稍後再試",images_unavailable:"此裝置不支援照片辨識，請改貼文字",image_rejected:"照片格式不符或太大",refused:"無法辨識此照片",invalid_json:"辨識結果無法解析，請重拍或改貼文字",session_expired:"請重新登入"})[c]||"辨識失敗，請再試一次";}
@@ -439,7 +444,7 @@ function renderStep3(){
             <div class="mn">${esc(x.name)} ${roleChip(x.role)} <span class="tierbadge t${tier}">建議 ${tier||"–"}</span></div>
             <div class="mm"><span>綜合 <span class="score">${x.composite.toFixed(0)}</span></span><span>貢獻 ${fmt(x.cv)}</span>${alist.map(k=>x.rank[k]?`<span class="arank">${esc(k.slice(0,2))}#${x.rank[k]}</span>`:"").join("")}<span>已拿 ${myA.reduce((s,a)=>s+a.qty,0)}</span></div>
           </div>
-          ${canWrite?`<div class="give">${myA.reduce((s,a)=>s+Number(a.qty||0),0)>=3?`<span class="muted" style="font-size:12px">已領滿 3 件</span>`:(remOpts.length?`<select data-giveto="${esc(x.name)}"><option value="">＋發放物品</option>${remOpts.map(l=>`<option value="${esc(l.item)}">${esc(l.item)}（剩${rem[l.item]}）</option>`).join("")}</select>`:`<span class="muted" style="font-size:12px">已無庫存</span>`)}</div>`:""}
+          ${canWrite?`<div class="give give3">${[0,1,2].map(s=>{const a=myA[s];const opts=remOpts.filter(l=>!a||l.item!==a.item);return `<select class="${a?'has':''}" data-slot data-member="${esc(x.name)}" data-allocid="${a?a.id:''}"><option value="">${a?'✕ 清除':'＋發放'}</option>${a?`<option value="${esc(a.item)}" selected>${esc(a.item)}</option>`:''}${opts.map(l=>`<option value="${esc(l.item)}">${esc(l.item)}（剩${rem[l.item]}）</option>`).join("")}</select>`;}).join("")}</div>`:""}
         </div>
         ${(myW.length||myA.length||canWrite)?`<div class="mchips">
           ${myW.length?`<span class="lbl">許願</span>${myW.map(w=>`<span class="chip wish">${iconFor(w.item)} ${esc(w.item)}${canWrite?` <span class="del" data-act="delWish" data-id="${w.id}">✕</span>`:""}</span>`).join("")}`:""}
@@ -510,6 +515,7 @@ document.addEventListener("click",e=>{
   if(act==="exportAnn")return exportAnnouncement();
 });
 document.addEventListener("change",e=>{
+  const sl=e.target.closest("[data-slot]");if(sl){changeSlot(sl.dataset.member,sl.dataset.allocid,sl.value);return;}
   const g=e.target.closest("[data-giveto]");if(g&&g.value){const m=g.dataset.giveto,it=g.value;g.value="";addAlloc(m,it);return;}
   const w=e.target.closest("[data-wishfor]");if(w&&w.value){const m=w.dataset.wishfor,it=w.value;w.value="";addWish(m,it);}
 });
