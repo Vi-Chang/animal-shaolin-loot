@@ -113,6 +113,18 @@ Deno.serve(async (req) => {
       return json({ error: "bad_path" }, 400);
     }
 
+    if (a === "delMember") {
+      if (!(await auth(body))) return json({ error: "unauthorized" }, 401);
+      const name = body.name;
+      if (!name) return json({ error: "missing" }, 400);
+      await sql.begin(async (tx) => {
+        await tx`delete from loot.allocations where member=${name}`;
+        await tx`delete from loot.wishes where member=${name}`;
+        await tx`delete from loot.members where name=${name}`;
+      });
+      return json({ ok: true });
+    }
+
     if (a === "resetRound") {
       if (!(await auth(body))) return json({ error: "unauthorized" }, 401);
       const id = body.roundId;
