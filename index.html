@@ -164,8 +164,8 @@
     </div>
     <nav class="tabs" id="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="step1" aria-selected="true">① 本期戰利品</button>
-      <button class="tab" role="tab" data-tab="step2" aria-selected="false">② 上傳資料</button>
-      <button class="tab" role="tab" data-tab="step3" aria-selected="false">③ 本期分配</button>
+      <button class="tab" role="tab" data-tab="step3" aria-selected="false">② 本期分配</button>
+      <button class="tab" role="tab" data-tab="step2" aria-selected="false">③ 上傳資料·參考</button>
       <button class="tab" role="tab" data-tab="roster" aria-selected="false">名單</button>
       <button class="tab" role="tab" data-tab="history" aria-selected="false">歷史</button>
       <button class="tab" role="tab" data-tab="help" aria-selected="false">說明</button>
@@ -294,10 +294,11 @@ async function archiveActive(){const r=activeRound();if(!r)return;await guardWri
 async function resetWeek(){const r=activeRound();if(!r)return;if(!confirm("重置本期統計？\n\n會清空：貢獻分數、三個活動名次、所有許願、所有分配結果。\n保留：戰利品清單、成員名單。\n\n此動作無法復原。"))return;try{await api("resetRound",{roundId:r.id});toast("本期統計已重置");await pull();render();}catch(e){toast("重置失敗，請稍後再試",true);}}
 async function addLoot(item,total){const r=activeRound();if(!r){toast("請先建立分配期",true);return;}item=(item||"").trim();total=Math.max(1,Number(total)||1);if(!item)return;const loot=(r.loot||[]).slice();const ex=loot.find(l=>l.item===item);if(ex)ex.total=Number(ex.total||0)+total;else loot.push({item,total});await guardWrite(async()=>{await saveRound(r.id,{loot});toast("入庫："+item+"×"+total);});}
 async function setLootTotal(item,total){const r=activeRound();if(!r)return;total=Math.max(0,Number(total)||0);await guardWrite(async()=>{await saveRound(r.id,{loot:(r.loot||[]).map(l=>l.item===item?{...l,total}:l)});});}
+function lootStep(item,d){const r=activeRound();if(!r)return;const cur=(r.loot||[]).find(x=>x.item===item);if(!cur)return;const nt=Math.max(0,Number(cur.total||0)+d);const loot=(r.loot||[]).map(x=>x.item===item?{...x,total:nt}:x);if(state.rounds[r.id])state.rounds[r.id].loot=loot;render();guardWrite(async()=>{await saveRound(r.id,{loot});});}
 async function delLoot(item){const r=activeRound();if(!r)return;await guardWrite(async()=>{await saveRound(r.id,{loot:(r.loot||[]).filter(l=>l.item!==item)});});}
 async function addWish(member,item){if(!item||!member)return;const r=activeRound();if(!r){toast("尚無分配期",true);return;}try{await DB.collection("wishes").add({roundId:r.id,member,item,ts:Date.now()});toast("已許願："+member+" → "+item);}catch(e){toast("許願失敗，請稍後再試",true);}}
 async function delWish(id){try{await DB.doc("wishes/"+id).delete();}catch(e){toast("刪除失敗",true);}}
-async function addAlloc(member,item){const r=activeRound();if(!r)return;const rem=remainingMap(r)[item]??0;if(rem<1){toast("「"+item+"」已分完，數量不夠！",true);return;}await guardWrite(async()=>{await DB.collection("allocations").add({roundId:r.id,member,item,qty:1,ts:Date.now()});toast("✓ "+item+" → "+member+"，剩 "+(rem-1));});}
+async function addAlloc(member,item){const r=activeRound();if(!r)return;const got=allocOf(r.id).filter(a=>a.member===member).reduce((s,a)=>s+Number(a.qty||0),0);if(got>=3){toast(member+" 已領滿 3 件（每人最多 3 個）",true);return;}const rem=remainingMap(r)[item]??0;if(rem<1){toast("「"+item+"」已分完，數量不夠！",true);return;}await guardWrite(async()=>{await DB.collection("allocations").add({roundId:r.id,member,item,qty:1,ts:Date.now()});toast("✓ "+item+" → "+member+"，剩 "+(rem-1));});}
 async function delAlloc(id){await guardWrite(async()=>{await DB.doc("allocations/"+id).delete();});}
 
 /* ---------- 影像辨識（排除非家族） ---------- */
@@ -355,7 +356,7 @@ function renderStep1(){
     <p class="hint">確認這次要分配的稀有物品與數量。用申請＋銀兩買的（荷塘風光、寶石禮袋等）不用登記。</p>
     ${(r.loot||[]).length?`<div>${r.loot.map(l=>`<div class="lootrow">
         <span class="nm">${iconFor(l.item)} ${esc(l.item)}</span>
-        ${canWrite?`<input type="number" min="0" value="${l.total}" data-total="${esc(l.item)}"><button class="btn sm" data-act="setTotal" data-item="${esc(l.item)}">改</button><button class="btn sm" data-act="delLoot" data-item="${esc(l.item)}">刪</button>`:`<span class="rem tnum">${l.total}</span>`}
+        ${canWrite?`<button class="btn sm" data-act="lootDec" data-item="${esc(l.item)}">−</button><span class="rem tnum" style="display:inline-block;min-width:36px;text-align:center">${l.total}</span><button class="btn sm" data-act="lootInc" data-item="${esc(l.item)}">＋</button><button class="btn sm" data-act="delLoot" data-item="${esc(l.item)}" style="margin-left:8px">刪</button>`:`<span class="rem tnum">${l.total}</span>`}
       </div>`).join("")}</div>`:`<p class="empty">尚未登記戰利品</p>`}
     ${canWrite?`<div class="row" style="margin-top:14px">
       <input list="itemlist" id="newLootName" type="text" placeholder="物品名稱" style="flex:1 1 150px">
@@ -363,7 +364,7 @@ function renderStep1(){
       <input type="number" id="newLootQty" min="1" value="1"><button class="btn primary" data-act="addLoot">新增</button>
     </div>`:""}
   </div>
-  <div class="next"><button class="btn jade big" data-act="go" data-to="step2">下一步：上傳資料 →</button></div>`;
+  <div class="next"><button class="btn jade big" data-act="go" data-to="step3">下一步：開始分配 →</button></div>`;
 }
 
 function upBlock(key,label,desc,tag,del){
@@ -386,7 +387,7 @@ function renderStep2(){
   const c=r.contributions||{},acts=r.activities||{};
   const cCount=Object.keys(c).length,alist=actList(r);
   v.innerHTML=`${bannerLive()}
-  <div class="card"><div class="stephead">步驟二　共 3 步</div>
+  <div class="card"><div class="stephead">步驟三 · 補充參考</div>
     <h2>上傳本期資料</h2>
     <p class="hint">上傳截圖，我幫你辨識並<b>自動排除其他家族的人</b>。活動只看名次、不看分數。</p>
     <div class="row" style="gap:16px;margin-bottom:6px">
@@ -398,7 +399,7 @@ function renderStep2(){
     ${alist.map(k=>upBlock(k,k+" 排名","活動排名，只計名次"+(ACTS.indexOf(k)<0?"（自訂）":""),"只計名次",ACTS.indexOf(k)<0)).join("")}
     ${canWrite?`<div class="up" style="border-style:dashed"><h3>➕ 新增其他活動</h3><div class="muted" style="font-size:12.5px;margin:2px 0 6px">加入其他活動排名，一樣只計名次、自動排除外家族。</div><div class="row"><input type="text" id="newActName" placeholder="活動名稱，例：跨服聯賽" style="flex:1 1 160px"><button class="btn primary" data-act="addAct">新增活動</button></div></div>`:""}
   </div>
-  <div class="next"><button class="btn jade big" data-act="go" data-to="step3">下一步：開始分配 →</button></div>`;
+  <div class="next"><button class="btn" data-act="go" data-to="step3">← 回本期分配</button></div>`;
 }
 
 function renderStep3(){
@@ -410,7 +411,7 @@ function renderStep3(){
   const shortItems=(r.loot||[]).filter(l=>(rem[l.item]??0)<=0);
   const remOpts=(r.loot||[]).filter(l=>(rem[l.item]??0)>0);
   v.innerHTML=`${bannerLive()}
-  <div class="card"><div class="stephead">步驟三　共 3 步</div>
+  <div class="card"><div class="stephead">步驟二　共 3 步</div>
     <h2>本期分配 <span class="chip">${esc(r.name)}</span></h2>
     <div class="kpi" style="margin:8px 0"><div><div class="b tnum">${fmt(givenItems)}<span class="muted" style="font-size:15px">/${fmt(totalItems)}</span></div><div class="l">已分 / 總件數</div></div><div><div class="b tnum">${new Set(allocs.map(a=>a.member)).size}</div><div class="l">已分到人數</div></div></div>
     ${shortItems.length?`<div class="warnbar">⚠ 已分完：${shortItems.map(l=>esc(l.item)+"（剩"+(rem[l.item]??0)+"）").join("、")}</div>`:""}
@@ -438,7 +439,7 @@ function renderStep3(){
             <div class="mn">${esc(x.name)} ${roleChip(x.role)} <span class="tierbadge t${tier}">建議 ${tier||"–"}</span></div>
             <div class="mm"><span>綜合 <span class="score">${x.composite.toFixed(0)}</span></span><span>貢獻 ${fmt(x.cv)}</span>${alist.map(k=>x.rank[k]?`<span class="arank">${esc(k.slice(0,2))}#${x.rank[k]}</span>`:"").join("")}<span>已拿 ${myA.reduce((s,a)=>s+a.qty,0)}</span></div>
           </div>
-          ${canWrite?`<div class="give">${remOpts.length?`<select data-giveto="${esc(x.name)}"><option value="">＋發放物品</option>${remOpts.map(l=>`<option value="${esc(l.item)}">${iconFor(l.item)} ${esc(l.item)}（剩${rem[l.item]}）</option>`).join("")}</select>`:`<span class="muted" style="font-size:12px">已無庫存</span>`}</div>`:""}
+          ${canWrite?`<div class="give">${myA.reduce((s,a)=>s+Number(a.qty||0),0)>=3?`<span class="muted" style="font-size:12px">已領滿 3 件</span>`:(remOpts.length?`<select data-giveto="${esc(x.name)}"><option value="">＋發放物品</option>${remOpts.map(l=>`<option value="${esc(l.item)}">${esc(l.item)}（剩${rem[l.item]}）</option>`).join("")}</select>`:`<span class="muted" style="font-size:12px">已無庫存</span>`)}</div>`:""}
         </div>
         ${(myW.length||myA.length||canWrite)?`<div class="mchips">
           ${myW.length?`<span class="lbl">許願</span>${myW.map(w=>`<span class="chip wish">${iconFor(w.item)} ${esc(w.item)}${canWrite?` <span class="del" data-act="delWish" data-id="${w.id}">✕</span>`:""}</span>`).join("")}`:""}
@@ -496,6 +497,8 @@ document.addEventListener("click",e=>{
   if(act==="delAct")return delActivity(el.dataset.key);
   if(act==="createRound"){const n=$("#nrName").value.trim(),d=$("#nrDate").value.trim()||new Date().toISOString().slice(0,10);return createRound(n,d);}
   if(act==="addLoot"){const n=$("#newLootName").value.trim(),q=$("#newLootQty").value;if(!n)return toast("請輸入物品名稱",true);return addLoot(n,q);}
+  if(act==="lootDec")return lootStep(el.dataset.item,-1);
+  if(act==="lootInc")return lootStep(el.dataset.item,1);
   if(act==="setTotal"){const it=el.dataset.item,inp=document.querySelector(`[data-total="${CSS.escape(it)}"]`);return setLootTotal(it,inp.value);}
   if(act==="delLoot")return delLoot(el.dataset.item);
   if(act==="toggleGhost")return toggleGhost(el.dataset.name);
