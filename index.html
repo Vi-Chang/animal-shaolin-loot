@@ -393,6 +393,7 @@ function renderStep2(){
       <div><span class="muted" style="font-size:12px">貢獻</span> <b>${cCount}</b> 筆</div>
       ${alist.map(k=>`<div><span class="muted" style="font-size:12px">${esc(k)}</span> <b>${(acts[k]||[]).length}</b> 名</div>`).join("")}
     </div>
+    ${canWrite?`<div class="row" style="margin:2px 0 12px"><button class="btn" data-act="resetWeek">🔄 重置本期統計（清空貢獻／活動／許願／分配）</button></div>`:""}
     ${upBlock("contrib","家族貢獻度","家族貢獻截圖（計分數）","計分")}
     ${alist.map(k=>upBlock(k,k+" 排名","活動排名，只計名次"+(ACTS.indexOf(k)<0?"（自訂）":""),"只計名次",ACTS.indexOf(k)<0)).join("")}
     ${canWrite?`<div class="up" style="border-style:dashed"><h3>➕ 新增其他活動</h3><div class="muted" style="font-size:12.5px;margin:2px 0 6px">加入其他活動排名，一樣只計名次、自動排除外家族。</div><div class="row"><input type="text" id="newActName" placeholder="活動名稱，例：跨服聯賽" style="flex:1 1 160px"><button class="btn primary" data-act="addAct">新增活動</button></div></div>`:""}
